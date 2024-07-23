@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "nucleus/avalanche/eaws.h"
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <memory>
@@ -27,7 +28,9 @@ class AbstractRenderWindow;
 class DataQuerier;
 namespace tile_scheduler {
 class TileLoadService;
+class TileLoadServiceEaws;
 class Scheduler;
+class SchedulerEaws;
 }
 namespace camera {
 class Controller;
@@ -42,6 +45,7 @@ public:
     camera::Controller* camera_controller() const;
 
     tile_scheduler::Scheduler* tile_scheduler() const;
+    tile_scheduler::SchedulerEaws* tile_scheduler_eaws() const;
 
 private:
     AbstractRenderWindow* m_render_window;
@@ -52,7 +56,10 @@ private:
     std::unique_ptr<tile_scheduler::TileLoadService> m_terrain_service;
     std::unique_ptr<tile_scheduler::TileLoadService> m_ortho_service;
     std::unique_ptr<tile_scheduler::TileLoadService> m_vectortile_service;
+    std::unique_ptr<tile_scheduler::TileLoadService> m_eaws_service; // eaws: new
+
     std::unique_ptr<tile_scheduler::Scheduler> m_tile_scheduler;
+    std::unique_ptr<tile_scheduler::SchedulerEaws> m_tile_scheduler_eaws; // eaws: new
     std::shared_ptr<DataQuerier> m_data_querier;
     std::unique_ptr<camera::Controller> m_camera_controller;
 };

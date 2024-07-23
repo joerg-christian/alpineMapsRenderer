@@ -75,6 +75,7 @@ qt_add_library(nucleus STATIC
     tile_scheduler/Cache.h
     tile_scheduler/TileLoadService.h tile_scheduler/TileLoadService.cpp
     tile_scheduler/Scheduler.h tile_scheduler/Scheduler.cpp
+    tile_scheduler/SchedulerEaws.h tile_scheduler/SchedulerEaws.cpp
     tile_scheduler/SlotLimiter.h tile_scheduler/SlotLimiter.cpp
     tile_scheduler/RateLimiter.h tile_scheduler/RateLimiter.cpp
     camera/CadInteraction.h camera/CadInteraction.cpp
@@ -107,6 +108,14 @@ qt_add_library(nucleus STATIC
     utils/ColourTexture.h utils/ColourTexture.cpp
     avalanche/eaws.h avalanche/eaws.cpp
     avalanche/eaws.cpp
+    tile_scheduler/SlotLimiterEAWS.cpp
+    tile_scheduler/SlotLimiterEaws.h
+    tile_scheduler/QuadAssemblerEaws.h
+    tile_scheduler/QuadAssemblerEaws.cpp
+
+
+
+
 )
 
 target_include_directories(nucleus PUBLIC ${CMAKE_SOURCE_DIR})

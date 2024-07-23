@@ -35,13 +35,14 @@
 #include "RenderThreadNotifier.h"
 #include "TerrainRenderer.h"
 #include "gl_engine/Window.h"
-#include "nucleus/camera/Controller.h"
 #include "nucleus/Controller.h"
-#include "nucleus/tile_scheduler/Scheduler.h"
-#include "nucleus/srs.h"
-#include "nucleus/utils/sun_calculations.h"
+#include "nucleus/camera/Controller.h"
 #include "nucleus/camera/PositionStorage.h"
+#include "nucleus/srs.h"
+#include "nucleus/tile_scheduler/Scheduler.h"
+#include "nucleus/tile_scheduler/SchedulerEaws.h"
 #include "nucleus/utils/UrlModifier.h"
+#include "nucleus/utils/sun_calculations.h"
 
 namespace {
 // helper type for the visitor from https://en.cppreference.com/w/cpp/utility/variant/visit
@@ -120,20 +121,27 @@ QQuickFramebufferObject::Renderer* TerrainRendererItem::createRenderer() const
     //connect(this, &TerrainRendererItem::ind)
 
     auto* const tile_scheduler = r->controller()->tile_scheduler();
+    auto* const tile_scheduler_eaws = r->controller()->tile_scheduler_eaws();
     connect(this->m_settings, &AppSettings::render_quality_changed, tile_scheduler, [=](float new_render_quality) {
         const auto permissible_error = 1.0f / new_render_quality;
         tile_scheduler->set_permissible_screen_space_error(permissible_error);
     });
+    connect(this->m_settings, &AppSettings::render_quality_changed, tile_scheduler_eaws, [=](float new_render_quality) {
+        const auto permissible_error = 1.0f / new_render_quality;
+        tile_scheduler_eaws->set_permissible_screen_space_error(permissible_error);
+    });
     connect(this, &TerrainRendererItem::tile_cache_size_changed, tile_scheduler, &nucleus::tile_scheduler::Scheduler::set_ram_quad_limit);
-    connect(tile_scheduler, &nucleus::tile_scheduler::Scheduler::quads_requested, this, [this](const std::vector<tile::Id>& ids) {
-        const_cast<TerrainRendererItem*>(this)->set_queued_tiles(unsigned(ids.size()));
-    });
-    connect(tile_scheduler, &nucleus::tile_scheduler::Scheduler::quad_received, this, [this]() {
-        const_cast<TerrainRendererItem*>(this)->set_queued_tiles(std::max(this->queued_tiles(), 1u) - 1);
-    });
-    connect(tile_scheduler, &nucleus::tile_scheduler::Scheduler::statistics_updated, this, [this](const nucleus::tile_scheduler::Scheduler::Statistics& stats) {
-        const_cast<TerrainRendererItem*>(this)->set_cached_tiles(stats.n_tiles_in_ram_cache);
-    });
+    connect(this, &TerrainRendererItem::eaws_tile_cache_size_changed, tile_scheduler_eaws, &nucleus::tile_scheduler::SchedulerEaws::set_ram_quad_limit);
+    connect(tile_scheduler, &nucleus::tile_scheduler::Scheduler::quads_requested, this,
+        [this](const std::vector<tile::Id>& ids) { const_cast<TerrainRendererItem*>(this)->set_queued_tiles(unsigned(ids.size())); });
+    connect(tile_scheduler_eaws, &nucleus::tile_scheduler::SchedulerEaws::quads_requested, this,
+        [this](const std::vector<tile::Id>& ids) { const_cast<TerrainRendererItem*>(this)->set_queued_eaws_tiles(unsigned(ids.size())); });
+    connect(tile_scheduler_eaws, &nucleus::tile_scheduler::SchedulerEaws::quad_received, this,
+        [this]() { const_cast<TerrainRendererItem*>(this)->set_queued_eaws_tiles(std::max(this->queued_eaws_tiles(), 1u) - 1); });
+    connect(tile_scheduler_eaws, &nucleus::tile_scheduler::SchedulerEaws::statistics_updated, this,
+        [this](const nucleus::tile_scheduler::SchedulerEaws::Statistics& stats) {
+            const_cast<TerrainRendererItem*>(this)->set_cached_eaws_tiles(stats.n_tiles_in_ram_cache);
+        });
 
     // connect glWindow to forward key events.
     connect(this, &TerrainRendererItem::key_pressed, r->glWindow(), &gl_engine::Window::key_press);
@@ -144,9 +152,8 @@ QQuickFramebufferObject::Renderer* TerrainRendererItem::createRenderer() const
 
     connect(r->glWindow(), &gl_engine::Window::report_measurements, this->m_timer_manager, &TimerFrontendManager::receive_measurements);
 
-    connect(r->controller()->tile_scheduler(), &nucleus::tile_scheduler::Scheduler::gpu_quads_updated, RenderThreadNotifier::instance(), &RenderThreadNotifier::notify);
     connect(tile_scheduler, &nucleus::tile_scheduler::Scheduler::gpu_quads_updated, RenderThreadNotifier::instance(), &RenderThreadNotifier::notify);
-
+    connect(tile_scheduler_eaws, &nucleus::tile_scheduler::SchedulerEaws::gpu_quads_updated, RenderThreadNotifier::instance(), &RenderThreadNotifier::notify);
     // We now have to initialize everything based on the url, but we need to do this on the thread this instance
     // belongs to. (gui thread?) Therefore we use the following signal to signal the init process
     emit init_after_creation();
@@ -451,6 +458,46 @@ void TerrainRendererItem::set_tile_cache_size(unsigned int new_tile_cache_size)
         return;
     m_tile_cache_size = new_tile_cache_size;
     emit tile_cache_size_changed(m_tile_cache_size);
+}
+
+unsigned int TerrainRendererItem::in_flight_eaws_tiles() const { return m_in_flight_eaws_tiles; }
+
+void TerrainRendererItem::set_in_flight_eaws_tiles(unsigned int new_in_flight_eaws_tiles)
+{
+    if (m_in_flight_eaws_tiles == new_in_flight_eaws_tiles)
+        return;
+    m_in_flight_eaws_tiles = new_in_flight_eaws_tiles;
+    emit in_flight_eaws_tiles_changed(m_in_flight_eaws_tiles);
+}
+
+unsigned int TerrainRendererItem::queued_eaws_tiles() const { return m_queued_eaws_tiles; }
+
+void TerrainRendererItem::set_queued_eaws_tiles(unsigned int new_queued_eaws_tiles)
+{
+    if (m_queued_eaws_tiles == new_queued_eaws_tiles)
+        return;
+    m_queued_eaws_tiles = new_queued_eaws_tiles;
+    emit queued_eaws_tiles_changed(m_queued_eaws_tiles);
+}
+
+unsigned int TerrainRendererItem::cached_eaws_tiles() const { return m_cached_eaws_tiles; }
+
+void TerrainRendererItem::set_cached_eaws_tiles(unsigned int new_cached_eaws_tiles)
+{
+    if (m_cached_eaws_tiles == new_cached_eaws_tiles)
+        return;
+    m_cached_eaws_tiles = new_cached_eaws_tiles;
+    emit cached_eaws_tiles_changed(m_cached_eaws_tiles);
+}
+
+unsigned int TerrainRendererItem::eaws_tile_cache_size() const { return m_eaws_tile_cache_size; }
+
+void TerrainRendererItem::set_eaws_tile_cache_size(unsigned int new_eaws_tile_cache_size)
+{
+    if (m_eaws_tile_cache_size == new_eaws_tile_cache_size)
+        return;
+    m_eaws_tile_cache_size = new_eaws_tile_cache_size;
+    emit eaws_tile_cache_size_changed(m_eaws_tile_cache_size);
 }
 
 QVector2D TerrainRendererItem::sun_angles() const {

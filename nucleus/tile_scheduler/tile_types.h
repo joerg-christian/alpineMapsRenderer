@@ -96,6 +96,16 @@ struct TileQuad {
 static_assert(NamedTile<TileQuad>);
 static_assert(SerialisableTile<TileQuad>);
 
+struct EawsQuad {
+    tile::Id id;
+    unsigned n_tiles = 0;
+    std::array<TileLayer, 4> tiles = {};
+    NetworkInfo network_info() const { return NetworkInfo::join(tiles[0].network_info, tiles[1].network_info, tiles[2].network_info, tiles[3].network_info); }
+    static constexpr std::array<char, 25> version_information = { "TileQuad, version 0.3" };
+};
+static_assert(NamedTile<EawsQuad>);
+static_assert(SerialisableTile<EawsQuad>);
+
 struct GpuCacheInfo {
     tile::Id id;
 };
@@ -110,10 +120,22 @@ struct GpuLayeredTile {
 };
 static_assert(NamedTile<GpuLayeredTile>);
 
+struct GpuEawsTile {
+    tile::Id id;
+    std::shared_ptr<const nucleus::Raster<uint16_t>> raster;
+};
+static_assert(NamedTile<GpuEawsTile>);
+
 struct GpuTileQuad {
     tile::Id id;
     std::array<GpuLayeredTile, 4> tiles;
 };
 static_assert(NamedTile<GpuTileQuad>);
+
+struct GpuEawsQuad {
+    tile::Id id;
+    std::array<GpuEawsTile, 4> tiles;
+};
+static_assert(NamedTile<GpuEawsQuad>);
 
 } // namespace nucleus::tile_scheduler::tile_types

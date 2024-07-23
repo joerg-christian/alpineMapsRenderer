@@ -18,7 +18,6 @@
 
 #include "Controller.h"
 #include "DataQuerier.h"
-
 #include <QCoreApplication>
 #include <QFile>
 #include <QNetworkReply>
@@ -31,9 +30,12 @@
 #include "nucleus/camera/PositionStorage.h"
 #include "nucleus/tile_scheduler/LayerAssembler.h"
 #include "nucleus/tile_scheduler/QuadAssembler.h"
+#include "nucleus/tile_scheduler/QuadAssemblerEaws.h"
 #include "nucleus/tile_scheduler/RateLimiter.h"
 #include "nucleus/tile_scheduler/Scheduler.h"
+#include "nucleus/tile_scheduler/SchedulerEaws.h"
 #include "nucleus/tile_scheduler/SlotLimiter.h"
+#include "nucleus/tile_scheduler/SlotLimiterEaws.h"
 #include "nucleus/tile_scheduler/TileLoadService.h"
 #include "nucleus/tile_scheduler/utils.h"
 #include "radix/TileHeights.h"
@@ -60,6 +62,7 @@ Controller::Controller(AbstractRenderWindow* render_window)
         new TileLoadService("https://gataki.cg.tuwien.ac.at/raw/basemap/tiles/", TileLoadService::UrlPattern::ZYX_yPointingSouth, ".jpeg"));
     m_vectortile_service = std::make_unique<TileLoadService>(
         "http://localhost:8080/austria.peaks/", nucleus::tile_scheduler::TileLoadService::UrlPattern::ZXY_yPointingSouth, ".mvt");
+    m_eaws_service = std::make_unique<TileLoadService>("http://localhost:3000/eaws-regions/", TileLoadService::UrlPattern::ZXY, ""); // eaws new
 
     m_tile_scheduler = std::make_unique<nucleus::tile_scheduler::Scheduler>();
     m_tile_scheduler->read_disk_cache();
@@ -107,6 +110,40 @@ Controller::Controller(AbstractRenderWindow* render_window)
         connect(n, &QNetworkInformation::reachabilityChanged, m_tile_scheduler.get(), &Scheduler::set_network_reachability);
     }
 
+    // eaws: new scheduler
+    m_tile_scheduler_eaws = std::make_unique<nucleus::tile_scheduler::SchedulerEaws>();
+    m_tile_scheduler_eaws->read_disk_cache();
+    m_tile_scheduler_eaws->set_gpu_quad_limit(512);
+    m_tile_scheduler_eaws->set_ram_quad_limit(12000);
+    {
+        QFile file(":/map/height_data.atb");
+        const auto open = file.open(QIODeviceBase::OpenModeFlag::ReadOnly);
+        assert(open);
+        Q_UNUSED(open);
+        const QByteArray data = file.readAll();
+        const auto decorator = nucleus::tile_scheduler::utils::AabbDecorator::make(TileHeights::deserialise(data));
+        m_tile_scheduler_eaws->set_aabb_decorator(decorator);
+    }
+    m_tile_scheduler_eaws->set_dataquerier(m_data_querier);
+    {
+        auto* sch = m_tile_scheduler_eaws.get();
+        SlotLimiterEaws* sl = new SlotLimiterEaws(sch);
+        RateLimiter* rl = new RateLimiter(sch);
+        QuadAssemblerEaws* qa = new QuadAssemblerEaws(sch);
+        connect(sch, &SchedulerEaws::quads_requested, sl, &SlotLimiterEaws::request_quads);
+        connect(sl, &SlotLimiterEaws::quad_requested, rl, &RateLimiter::request_quad);
+        connect(rl, &RateLimiter::quad_requested, qa, &QuadAssemblerEaws::load);
+        connect(qa, &QuadAssemblerEaws::tile_requested, m_eaws_service.get(), &TileLoadService::load);
+        connect(m_eaws_service.get(), &TileLoadService::load_finished, qa, &QuadAssemblerEaws::deliver_tile);
+        connect(qa, &QuadAssemblerEaws::quad_loaded, sl, &SlotLimiterEaws::deliver_quad);
+        connect(sl, &SlotLimiterEaws::quad_delivered, sch, &SchedulerEaws::receive_quad);
+    }
+    if (QNetworkInformation::loadDefaultBackend() && QNetworkInformation::instance()) {
+        QNetworkInformation* n = QNetworkInformation::instance();
+        m_tile_scheduler->set_network_reachability(n->reachability());
+        connect(n, &QNetworkInformation::reachabilityChanged, m_tile_scheduler.get(), &Scheduler::set_network_reachability);
+    }
+
 #ifdef ALP_ENABLE_THREADING
     m_scheduler_thread = std::make_unique<QThread>();
     m_scheduler_thread->setObjectName("tile_scheduler_thread");
@@ -118,24 +155,29 @@ Controller::Controller(AbstractRenderWindow* render_window)
     m_terrain_service->moveToThread(m_scheduler_thread.get());
     m_ortho_service->moveToThread(m_scheduler_thread.get());
     m_vectortile_service->moveToThread(m_scheduler_thread.get());
+    m_eaws_service->moveToThread(m_scheduler_thread.get());
 #endif
     m_tile_scheduler->moveToThread(m_scheduler_thread.get());
+    m_tile_scheduler_eaws->moveToThread(m_scheduler_thread.get());
     m_scheduler_thread->start();
 #endif
     connect(m_render_window, &AbstractRenderWindow::key_pressed, m_camera_controller.get(), &nucleus::camera::Controller::key_press);
     connect(m_render_window, &AbstractRenderWindow::key_released, m_camera_controller.get(), &nucleus::camera::Controller::key_release);
     connect(m_render_window, &AbstractRenderWindow::update_camera_requested, m_camera_controller.get(), &nucleus::camera::Controller::update_camera_request);
     connect(m_render_window, &AbstractRenderWindow::gpu_ready_changed, m_tile_scheduler.get(), &Scheduler::set_enabled);
-
+    connect(m_render_window, &AbstractRenderWindow::gpu_ready_changed, m_tile_scheduler_eaws.get(), &SchedulerEaws::set_enabled);
     // NOTICE ME!!!! READ THIS, IF YOU HAVE TROUBLES WITH SIGNALS NOT REACHING THE QML RENDERING THREAD!!!!111elevenone
     // In Qt the rendering thread goes to sleep (at least until Qt 6.5, See RenderThreadNotifier).
     // At the time of writing, an additional connection from tile_ready and tile_expired to the notifier is made.
     // this only works if ALP_ENABLE_THREADING is on, i.e., the tile scheduler is on an extra thread. -> potential issue on webassembly
     connect(m_camera_controller.get(), &nucleus::camera::Controller::definition_changed, m_tile_scheduler.get(), &Scheduler::update_camera);
+    connect(m_camera_controller.get(), &nucleus::camera::Controller::definition_changed, m_tile_scheduler_eaws.get(), &SchedulerEaws::update_camera);
     connect(m_camera_controller.get(), &nucleus::camera::Controller::definition_changed, m_render_window, &AbstractRenderWindow::update_camera);
 
     connect(m_tile_scheduler.get(), &Scheduler::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_gpu_quads);
+    // connect(m_tile_scheduler_eaws.get(), &SchedulerEaws::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_gpu_eaws_quads);
     connect(m_tile_scheduler.get(), &Scheduler::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_requested);
+    connect(m_tile_scheduler_eaws.get(), &SchedulerEaws::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_requested);
 
     m_camera_controller->update();
 }
@@ -157,4 +199,6 @@ Scheduler* Controller::tile_scheduler() const
 {
     return m_tile_scheduler.get();
 }
+
+SchedulerEaws* Controller::tile_scheduler_eaws() const { return m_tile_scheduler_eaws.get(); }
 } // namespace nucleus

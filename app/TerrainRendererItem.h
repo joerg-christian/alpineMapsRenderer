@@ -94,12 +94,16 @@ signals:
     void render_quality_changed(float new_render_quality);
 
     void in_flight_tiles_changed(unsigned new_n);
+    void in_flight_eaws_tiles_changed(unsigned new_n);
 
     void queued_tiles_changed(unsigned new_n);
+    void queued_eaws_tiles_changed(unsigned new_n);
 
     void cached_tiles_changed(unsigned new_n);
+    void cached_eaws_tiles_changed(unsigned new_n);
 
     void tile_cache_size_changed(unsigned new_cache_size);
+    void eaws_tile_cache_size_changed(unsigned new_cache_size);
 
     void gui_update_global_cursor_pos(double latitude, double longitude, double altitude);
 
@@ -181,6 +185,18 @@ public:
     [[nodiscard]] unsigned int tile_cache_size() const;
     void set_tile_cache_size(unsigned int new_tile_cache_size);
 
+    [[nodiscard]] unsigned int in_flight_eaws_tiles() const;
+    void set_in_flight_eaws_tiles(unsigned int new_in_flight_tiles);
+
+    [[nodiscard]] unsigned int queued_eaws_tiles() const;
+    void set_queued_eaws_tiles(unsigned int new_queued_eaws_tiles);
+
+    [[nodiscard]] unsigned int cached_eaws_tiles() const;
+    void set_cached_eaws_tiles(unsigned int new_cached_eaws_tiles);
+
+    [[nodiscard]] unsigned int eaws_tile_cache_size() const;
+    void set_eaws_tile_cache_size(unsigned int new_eaws_tile_cache_size);
+
     QVector2D sun_angles() const;
     void set_sun_angles(QVector2D new_sunAngles);
 
@@ -204,6 +220,10 @@ private:
     unsigned m_cached_tiles = 0;
     unsigned m_queued_tiles = 0;
     unsigned m_in_flight_tiles = 0;
+    unsigned m_eaws_tile_cache_size = 12000;
+    unsigned m_cached_eaws_tiles = 0;
+    unsigned m_queued_eaws_tiles = 0;
+    unsigned m_in_flight_eaws_tiles = 0;
     unsigned int m_selected_camera_position_index = 0;
     bool m_render_looped = false;
     QDateTime m_selected_datetime = QDateTime::currentDateTime();

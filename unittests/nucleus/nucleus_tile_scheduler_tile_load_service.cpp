@@ -19,13 +19,13 @@
 
 #include <algorithm>
 
+#include "nucleus/avalanche/eaws.h"
+#include "nucleus/tile_scheduler/TileLoadService.h"
+#include "nucleus/utils/tile_conversion.h"
+#include <QPainter>
 #include <QRegularExpression>
 #include <QSignalSpy>
 #include <catch2/catch_test_macros.hpp>
-
-#include "nucleus/tile_scheduler/TileLoadService.h"
-#include "nucleus/utils/tile_conversion.h"
-
 using namespace nucleus::tile_scheduler;
 using nucleus::tile_scheduler::tile_types::TileLayer;
 
@@ -114,7 +114,8 @@ TEST_CASE("nucleus/tile_scheduler/TileLoadService")
         }
     }
 
-    SECTION("network network info struct") {
+    SECTION("network info struct")
+    {
         using nucleus::tile_scheduler::tile_types::NetworkInfo;
         {
             const auto joined = NetworkInfo::join(NetworkInfo{NetworkInfo::Status::Good, 1}, NetworkInfo{NetworkInfo::Status::NotFound, 2});
@@ -184,6 +185,46 @@ TEST_CASE("nucleus/tile_scheduler/TileLoadService")
 //            image.save("/home/madam/Documents/work/tuw/alpinemaps/"
 //                       "build-alpine-renderer-Desktop_Qt_6_2_3_GCC_64bit-Debug/test.jpeg");
             CHECK(std::accumulate(image.constBits(), image.constBits() + image.sizeInBytes(), 0LLu) == 36'889'463LLu);
+        }
+    }
+    SECTION("download test eaws tiles")
+    {
+        // https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/9/177/273.jpeg => should be a white tile
+        // https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/9/179/272.jpeg => should show Tirol
+        const auto white_tile_id = tile::Id { .zoom_level = 9, .coords = { 273, 177 } };
+        const auto tirol_tile_id = tile::Id { .zoom_level = 9, .coords = { 272, 179 } };
+        TileLoadService service("http://localhost:3000/eaws-regions/", TileLoadService::UrlPattern::ZXY, "");
+
+        {
+            QSignalSpy spy(&service, &TileLoadService::load_finished);
+            service.load(white_tile_id);
+            spy.wait(10000);
+
+            REQUIRE(spy.count() == 1);
+            QList<QVariant> arguments = spy.takeFirst();
+            REQUIRE(arguments.size() == 1);
+            TileLayer tile = arguments.at(0).value<TileLayer>();
+            CHECK(tile.id == white_tile_id);
+            CHECK(tile.network_info.status == tile_types::NetworkInfo::Status::Good);
+            CHECK(utils::time_since_epoch() - tile.network_info.timestamp < 10'000);
+
+            // martin returns 0 if no data available
+            CHECK(tile.data->size() == 0);
+        }
+        {
+            QSignalSpy spy(&service, &TileLoadService::load_finished);
+            service.load(tirol_tile_id);
+            spy.wait(10000);
+
+            REQUIRE(spy.count() == 1);
+            QList<QVariant> arguments = spy.takeFirst();
+            REQUIRE(arguments.size() == 1);
+            const auto tile = arguments.at(0).value<TileLayer>();
+            CHECK(tile.id == tirol_tile_id);
+            CHECK(tile.network_info.status == tile_types::NetworkInfo::Status::Good);
+            CHECK(utils::time_since_epoch() - tile.network_info.timestamp < 10'000);
+
+            CHECK(tile.data->size() > 0);
         }
     }
 #ifndef __EMSCRIPTEN__

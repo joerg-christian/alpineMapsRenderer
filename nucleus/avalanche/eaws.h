@@ -58,11 +58,11 @@ private:
 QImage draw_regions(const RegionTile& region_tile, avalanche::eaws::UIntIdManager* internal_id_manager, const uint& image_width, const uint& image_height,
     const tile::Id& tile_id_out, const QImage::Format& image_format = QImage::Format_ARGB32);
 
-// Creates a raster from a QImage with regions in it. Throws error when raster_width or raster_height is 0.
+// Creates a raster and Qimg from a RegionTile with eaws egions in it. Throws error when raster_width or raster_height is 0.
 nucleus::Raster<uint16_t> rasterize_regions(const RegionTile& region_tile, avalanche::eaws::UIntIdManager* internal_id_manager, const uint raster_width,
     const uint raster_height, const tile::Id& tile_id_out);
 
-// Overload: Output has same resolution as EAWS regions, throws error when regions.size() == 0
+// Overload: Output has same resolution as input EAWS regions, throws error when regions.size() == 0
 nucleus::Raster<uint16_t> rasterize_regions(const RegionTile& region_tile, avalanche::eaws::UIntIdManager* internal_id_manager);
 } // namespace avalanche::eaws
 #endif // EAWS_H
