@@ -62,7 +62,7 @@ private:
     void add_tile(const tile::Id& id, const nucleus::vectortile::FeatureType& type, const nucleus::vectortile::VectorTile& vector_tile);
 
     std::unique_ptr<Texture> m_font_texture;
-    std::unordered_map<nucleus::vectortile::FeatureType, std::unique_ptr<QOpenGLTexture>> m_icon_texture;
+    std::unordered_map<nucleus::vectortile::FeatureType, std::unique_ptr<Texture>> m_icon_texture;
 
     std::unordered_map<nucleus::vectortile::FeatureType, std::unordered_map<tile::Id, std::shared_ptr<GPUVectorTile>, tile::Id::Hasher>> m_gpu_tiles;
 

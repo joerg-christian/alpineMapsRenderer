@@ -4,7 +4,8 @@
 #include <QPainter>
 #include <extern/tl_expected/include/tl/expected.hpp>
 #include <mapbox/vector_tile.hpp>
-#include <nucleus/Tile.h>
+#include <nucleus/Raster.h>
+#include <radix/tile.h>
 
 namespace avalanche::eaws {
 struct Region {

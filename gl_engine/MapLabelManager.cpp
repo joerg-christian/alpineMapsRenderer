@@ -56,10 +56,10 @@ void MapLabelManager::init()
     // load the icon texture
     for (int i = 0; i < nucleus::vectortile::FeatureType::ENUM_END - 1; i++) {
         nucleus::vectortile::FeatureType type = (nucleus::vectortile::FeatureType)i;
-        QImage icon = (label_meta.icons.contains(type)) ? label_meta.icons.at(type) : label_meta.icons.at(nucleus::vectortile::FeatureType::ENUM_END);
-        m_icon_texture[type] = std::make_unique<QOpenGLTexture>(icon);
-        m_icon_texture[type]->setMinificationFilter(QOpenGLTexture::LinearMipMapLinear);
-        m_icon_texture[type]->setMagnificationFilter(QOpenGLTexture::Linear);
+        const auto icon = (label_meta.icons.contains(type)) ? label_meta.icons.at(type) : label_meta.icons.at(nucleus::vectortile::FeatureType::ENUM_END);
+        m_icon_texture[type] = std::make_unique<Texture>(Texture::Target::_2d, Texture::Format::RGBA8);
+        m_icon_texture[type]->setParams(Texture::Filter::MipMapLinear, Texture::Filter::Linear);
+        m_icon_texture[type]->upload(icon);
     }
 
     m_index_buffer = std::make_unique<QOpenGLBuffer>(QOpenGLBuffer::IndexBuffer);

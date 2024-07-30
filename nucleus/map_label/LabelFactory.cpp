@@ -24,6 +24,7 @@
 #include <QStringLiteral>
 
 #include "nucleus/Raster.h"
+#include "nucleus/utils/image_loader.h"
 
 #define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -50,12 +51,12 @@ const LabelMeta LabelFactory::create_label_meta()
     }
 
     // paint svg icon into the an image of appropriate size
-    lm.icons[nucleus::vectortile::FeatureType::Peak] = QImage(":/map_icons/peak.png");
+    lm.icons[nucleus::vectortile::FeatureType::Peak] = nucleus::utils::image_loader::rgba8(":/map_icons/peak.png");
     // TODO add appropriate icon
-    lm.icons[nucleus::vectortile::FeatureType::City] = QImage(":/map_icons/peak.png");
+    lm.icons[nucleus::vectortile::FeatureType::City] = nucleus::utils::image_loader::rgba8(":/map_icons/peak.png");
 
     // TODO add appropriate default icon
-    lm.icons[nucleus::vectortile::FeatureType::ENUM_END] = QImage(":/map_icons/peak.png");
+    lm.icons[nucleus::vectortile::FeatureType::ENUM_END] = nucleus::utils::image_loader::rgba8(":/map_icons/peak.png");
 
     return lm;
 }

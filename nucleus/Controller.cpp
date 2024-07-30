@@ -161,8 +161,7 @@ Controller::Controller(AbstractRenderWindow* render_window)
     m_tile_scheduler_eaws->moveToThread(m_scheduler_thread.get());
     m_scheduler_thread->start();
 #endif
-    connect(m_render_window, &AbstractRenderWindow::key_pressed, m_camera_controller.get(), &nucleus::camera::Controller::key_press);
-    connect(m_render_window, &AbstractRenderWindow::key_released, m_camera_controller.get(), &nucleus::camera::Controller::key_release);
+
     connect(m_render_window, &AbstractRenderWindow::update_camera_requested, m_camera_controller.get(), &nucleus::camera::Controller::update_camera_request);
     connect(m_render_window, &AbstractRenderWindow::gpu_ready_changed, m_tile_scheduler.get(), &Scheduler::set_enabled);
     connect(m_render_window, &AbstractRenderWindow::gpu_ready_changed, m_tile_scheduler_eaws.get(), &SchedulerEaws::set_enabled);

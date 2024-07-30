@@ -18,11 +18,9 @@
 
 #pragma once
 
-#include <QImage>
+#include <unordered_map>
 
 #include <glm/glm.hpp>
-
-#include <unordered_map>
 
 #include <nucleus/Raster.h>
 #include <nucleus/vector_tiles/VectorTileFeature.h>
@@ -45,7 +43,7 @@ struct VertexData {
 
 struct LabelMeta {
     Raster<glm::u8vec2> font_atlas;
-    std::unordered_map<nucleus::vectortile::FeatureType, QImage> icons;
+    std::unordered_map<nucleus::vectortile::FeatureType, Raster<glm::u8vec4>> icons;
 };
 
 } // namespace nucleus::maplabel
