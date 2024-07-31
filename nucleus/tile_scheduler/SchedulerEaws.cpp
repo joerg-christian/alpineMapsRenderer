@@ -171,19 +171,27 @@ nucleus::Raster<uint16_t> SchedulerEaws::interpolate_tile(const tile::Id& input_
 void SchedulerEaws::update_gpu_quads()
 {
     const auto should_refine = tile_scheduler::utils::refineFunctor(m_current_camera, m_aabb_decorator, m_permissible_screen_space_error, m_tile_size);
-    std::vector<tile_types::EawsQuad> gpu_candidates;
-    m_ram_cache.visit([this, &gpu_candidates, &should_refine](const tile_types::EawsQuad& quad) {
+    m_ram_cache.visit([&should_refine](const tile_types::EawsQuad& quad) {
         if (!should_refine(quad.id))
             return false;
-        if (m_gpu_cached.contains(quad.id))
-            return true;
+        return true;
+    });
+    const std::vector<tile::Id> all_quads = tiles_for_current_camera_position();
+    std::vector<tile::Id> generatable_quads;
+    std::copy_if(all_quads.begin(), all_quads.end(), std::back_inserter(generatable_quads), [](const tile::Id& tile_id) {
+        /// TODO: return true if generatable
+        return false;
+    });
 
-        gpu_candidates.push_back(quad);
+    std::vector<tile::Id> gpu_candidates;
+    std::copy_if(generatable_quads.begin(), generatable_quads.end(), std::back_inserter(gpu_candidates), [this](const tile::Id& tile_id) {
+        if (m_gpu_cached.contains(tile_id))
+            return false;
         return true;
     });
 
     for (const auto& q : gpu_candidates) {
-        m_gpu_cached.insert(tile_types::GpuCacheInfo { q.id });
+        m_gpu_cached.insert(tile_types::GpuCacheInfo { q });
     }
 
     m_gpu_cached.visit([&should_refine](const tile_types::GpuCacheInfo& quad) {
@@ -259,7 +267,7 @@ void SchedulerEaws::send_quad_requests()
             }
         });
     emit quads_requested(fetch_these_quads_from_server);
-    emit quads_without_data_requested(interpolate_these);
+    // emit quads_without_data_requested(interpolate_these);
 }
 
 void SchedulerEaws::create_quads_without_data(const std::vector<tile::Id>& input_tile_ids)
