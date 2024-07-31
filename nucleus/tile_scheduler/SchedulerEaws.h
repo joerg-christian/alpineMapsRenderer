@@ -83,8 +83,9 @@ signals:
     void statistics_updated(Statistics stats);
     void quad_received(const tile::Id& ids);
     void quads_requested(const std::vector<tile::Id>& ids);
+    void quads_without_data_requested(const std::vector<tile::Id>& ids);
     void gpu_quads_updated(const std::vector<tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads); // eaws updated
-    void new_quad_for_interpolation_ready(const tile_types::EawsQuad& eaws_quads_for_interpolation);
+    void quad_above_zoom_level_created(const tile_types::EawsQuad& eaws_quads_for_interpolation);
 public slots:
     void update_camera(const nucleus::camera::Definition& camera);
     void receive_quad(const tile_types::EawsQuad& new_quad); // eaws updated
@@ -93,6 +94,7 @@ public slots:
     void send_quad_requests();
     void purge_ram_cache();
     void persist_tiles();
+    void create_quads_without_data(const std::vector<tile::Id>& ids);
 
 protected:
     void schedule_update();

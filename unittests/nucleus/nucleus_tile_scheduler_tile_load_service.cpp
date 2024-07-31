@@ -174,9 +174,9 @@ TEST_CASE("nucleus/tile_scheduler/TileLoadService")
     {
         // https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/9/177/273.jpeg => should be a white tile
         // https://maps.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/9/179/272.jpeg => should show Tirol
-        const auto white_tile_id = tile::Id { .zoom_level = 9, .coords = { 273, 177 } };
-        const auto tirol_tile_id = tile::Id { .zoom_level = 9, .coords = { 272, 179 } };
-        TileLoadService service("http://localhost:3000/eaws-regions/", TileLoadService::UrlPattern::ZXY, "");
+        const auto white_tile_id = tile::Id { .zoom_level = 9, .coords = { 273, 177 }, .scheme = tile::Scheme::SlippyMap };
+        const auto tirol_tile_id = tile::Id { .zoom_level = 9, .coords = { 272, 179 }, .scheme = tile::Scheme::SlippyMap };
+        TileLoadService service("http://localhost:3000/eaws-regions/", TileLoadService::UrlPattern::ZXY_yPointingSouth, "");
 
         {
             QSignalSpy spy(&service, &TileLoadService::load_finished);
