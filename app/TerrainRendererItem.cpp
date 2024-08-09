@@ -36,11 +36,11 @@
 #include "TerrainRenderer.h"
 #include "gl_engine/Window.h"
 #include "nucleus/Controller.h"
+#include "nucleus/avalanche/SchedulerEaws.h"
 #include "nucleus/camera/Controller.h"
 #include "nucleus/camera/PositionStorage.h"
 #include "nucleus/srs.h"
 #include "nucleus/tile_scheduler/Scheduler.h"
-#include "nucleus/tile_scheduler/SchedulerEaws.h"
 #include "nucleus/utils/UrlModifier.h"
 #include "nucleus/utils/sun_calculations.h"
 

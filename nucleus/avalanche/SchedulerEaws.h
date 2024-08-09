@@ -23,11 +23,11 @@
 #include <QNetworkInformation>
 #include <QObject>
 
-#include "Cache.h"
 #include "nucleus/avalanche/eaws.h"
 #include "nucleus/camera/Definition.h"
+#include "nucleus/tile_scheduler/Cache.h"
+#include "nucleus/tile_scheduler/tile_types.h"
 #include "radix/tile.h"
-#include "tile_types.h"
 
 class QTimer;
 

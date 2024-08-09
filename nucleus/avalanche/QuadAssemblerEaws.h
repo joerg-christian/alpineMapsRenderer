@@ -18,36 +18,31 @@
 
 #pragma once
 
-#include <unordered_set>
+#include <unordered_map>
 
 #include <QObject>
 
-#include <radix/tile.h>
-
-#include "tile_types.h"
+#include "nucleus/tile_scheduler/tile_types.h"
+#include "radix/tile.h"
 
 namespace nucleus::tile_scheduler {
 
-class SlotLimiterEaws : public QObject {
+class QuadAssemblerEaws : public QObject {
     Q_OBJECT
+    using TileId2EawsQuadMap = std::unordered_map<tile::Id, tile_types::EawsQuad, tile::Id::Hasher>;
 
-    unsigned m_limit = 16;
-    std::unordered_set<tile::Id, tile::Id::Hasher> m_in_flight;
-    std::vector<tile::Id> m_request_queue;
+    TileId2EawsQuadMap m_quads;
 
 public:
-    explicit SlotLimiterEaws(QObject* parent = nullptr);
-
-    void set_limit(unsigned int new_limit);
-    [[nodiscard]] unsigned int limit() const;
-    unsigned int slots_taken() const;
+    explicit QuadAssemblerEaws(QObject* parent = nullptr);
+    [[nodiscard]] size_t n_items_in_flight() const;
 
 public slots:
-    void request_quads(const std::vector<tile::Id>& id);
-    void deliver_quad(const tile_types::EawsQuad& tile);
+    void load(const tile::Id& tile_id);
+    void deliver_tile(const tile_types::TileLayer& tile);
 
 signals:
-    void quad_requested(const tile::Id& tile_id);
-    void quad_delivered(const tile_types::EawsQuad& id);
+    void tile_requested(const tile::Id& tile_id);
+    void quad_loaded(const tile_types::EawsQuad& tile);
 };
 }
