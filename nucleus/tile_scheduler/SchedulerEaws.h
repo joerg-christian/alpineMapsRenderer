@@ -85,7 +85,7 @@ signals:
     void quads_requested(const std::vector<tile::Id>& ids);
     void quads_without_data_requested(const std::vector<tile::Id>& ids);
     void gpu_quads_updated(const std::vector<tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads); // eaws updated
-    void quad_above_zoom_level_created(const tile_types::EawsQuad& eaws_quads_for_interpolation);
+
 public slots:
     void update_camera(const nucleus::camera::Definition& camera);
     void receive_quad(const tile_types::EawsQuad& new_quad); // eaws updated
@@ -94,14 +94,12 @@ public slots:
     void send_quad_requests();
     void purge_ram_cache();
     void persist_tiles();
-    void create_quads_without_data(const std::vector<tile::Id>& ids);
 
 protected:
     void schedule_update();
     void schedule_purge();
     void schedule_persist();
     void update_stats();
-    nucleus::Raster<uint16_t> interpolate_tile(const tile::Id& input_tile_id);
     std::vector<tile::Id> tiles_for_current_camera_position() const;
     std::shared_ptr<DataQuerier> m_dataquerier;
 
@@ -127,5 +125,6 @@ private:
     Cache<tile_types::GpuCacheInfo> m_gpu_cached;
     std::shared_ptr<QByteArray> m_default_tile;
     avalanche::eaws::UIntIdManager m_eaws_uint_id_manager;
+    nucleus::Raster<uint16_t> rasterize_from_max_zoom_tile(const tile::Id& input_tile_id);
 };
 } // namespace nucleus::tile_scheduler

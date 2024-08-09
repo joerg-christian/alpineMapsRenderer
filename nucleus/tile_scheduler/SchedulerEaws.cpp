@@ -56,8 +56,6 @@ SchedulerEaws::SchedulerEaws(const QByteArray& default_tile, QObject* parent)
     connect(m_persist_timer.get(), &QTimer::timeout, this, &SchedulerEaws::persist_tiles);
 
     m_default_tile = std::make_shared<QByteArray>(default_tile);
-    connect(this, &SchedulerEaws::quad_above_zoom_level_created, this, &SchedulerEaws::receive_quad);
-    connect(this, &SchedulerEaws::quads_without_data_requested, this, &SchedulerEaws::create_quads_without_data);
 }
 
 SchedulerEaws::~SchedulerEaws() = default;
@@ -86,10 +84,6 @@ void SchedulerEaws::receive_quad(const tile_types::EawsQuad& new_quad)
     switch (new_quad.network_info().status) {
     case Status::Good:
     case Status::NotFound:
-        if (new_quad.id.zoom_level == 0)
-            std::cout << "!!";
-        if (new_quad.id.zoom_level < 11)
-            std::cout << "!!";
         assert(new_quad.n_tiles == 4);
         m_ram_cache.insert(new_quad);
         schedule_purge();
@@ -126,86 +120,113 @@ void SchedulerEaws::set_network_reachability(QNetworkInformation::Reachability r
     }
 }
 
-nucleus::Raster<uint16_t> SchedulerEaws::interpolate_tile(const tile::Id& input_tile_id)
+// For a given quad (!): Returns parent quad id at provided zoom level (first entry) and child of this parent quad that is parent of provided tile id
+std::pair<tile::Id, tile::Id> find_parent_quad_and_child_id_at_zoom_level(const tile::Id& input_quad_id, const uint& parent_zoom_level)
+{
+    assert(input_quad_id.zoom_level >= parent_zoom_level);
+    tile::Id parent_quad_id = input_quad_id;
+    tile::Id parent_tile_id = input_quad_id;
+    while (parent_quad_id.zoom_level > parent_zoom_level) {
+        parent_tile_id = parent_quad_id;
+        parent_quad_id = parent_quad_id.parent();
+    }
+    return std::make_pair(parent_quad_id, parent_tile_id);
+}
+
+nucleus::Raster<uint16_t> SchedulerEaws::rasterize_from_max_zoom_tile(const tile::Id& input_tile_id)
 {
     // we only interpolate tiles above max zoom level, otherwise they are requested from eaws server!
     assert(input_tile_id.zoom_level > m_max_zoom_level);
 
-    // Calculate parent quad id on max zoom level
-    tile::Id best_parent_quad_id = input_tile_id;
-    while (best_parent_quad_id.zoom_level > m_max_zoom_level) {
-        best_parent_quad_id = best_parent_quad_id.parent();
-    }
+    // get parent quad and its child containing our tile such that child tile is at max zoom level
+    std::pair<tile::Id, tile::Id> parent_quad_and_child = find_parent_quad_and_child_id_at_zoom_level(input_tile_id, m_max_zoom_level - 1);
+    tile::Id parent_quad_id = parent_quad_and_child.first;
+    tile::Id parent_tile_id = parent_quad_and_child.second;
+    assert(m_ram_cache.contains(parent_quad_id));
 
-    // Go through parent quads starting at max zoom level -1 and check if they are in chache
-    // For this to work at least quad for zoom = 0 must be in cache
-    tile::Id best_parent_tile_id;
-    while (best_parent_quad_id.zoom_level > 0) {
-        best_parent_tile_id = best_parent_quad_id;
-        best_parent_quad_id = best_parent_quad_id.parent();
-        if (best_parent_quad_id.zoom_level == 0)
-            assert(m_ram_cache.contains(best_parent_quad_id));
-        //        if (m_ram_cache.contains(best_parent_quad_id))
-        //            break;
-    }
+    // Get the parent quad at zoom level = max_zoom -1
+    const tile_types::EawsQuad& parent_quad = m_ram_cache.peak_at(parent_quad_id);
 
-    // Get the best (= highest zoom) available quad
-    const tile_types::EawsQuad& best_parent_quad = m_ram_cache.peak_at(best_parent_quad_id);
-
-    // Get child tile that contains the input tile
-    tile_types::TileLayer best_parent_tile;
-    for (const tile_types::TileLayer& child : best_parent_quad.tiles) {
-        if (child.id == best_parent_tile_id) {
-            best_parent_tile = child;
+    // Get parent tile at max_zoom_level
+    tile_types::TileLayer parent_tile;
+    for (const tile_types::TileLayer& child : parent_quad.tiles) {
+        if (child.id == parent_tile_id) {
+            parent_tile = child;
             break;
         }
     }
 
-    // the parent tile of zoom lvel < 10 having no data means it contains no regions
-    if (0 == best_parent_tile.data->size())
+    // the parent tile having no data means it contains no regions, otherwise we use it to rasterize regions of the input tile
+    if (0 == parent_tile.data->size())
         return nucleus::Raster<uint16_t>(glm::uvec2(1, 1), 0);
-    auto result = avalanche::eaws::vector_tile_reader(*best_parent_tile.data, best_parent_tile_id);
+    auto result = avalanche::eaws::vector_tile_reader(*parent_tile.data, parent_tile_id);
+    assert(result.has_value());
     return avalanche::eaws::rasterize_regions(result.value(), &m_eaws_uint_id_manager, m_tile_size, m_tile_size, input_tile_id);
 }
 
 void SchedulerEaws::update_gpu_quads()
 {
+    // Just visit to update expiration date
     const auto should_refine = tile_scheduler::utils::refineFunctor(m_current_camera, m_aabb_decorator, m_permissible_screen_space_error, m_tile_size);
     m_ram_cache.visit([&should_refine](const tile_types::EawsQuad& quad) {
         if (!should_refine(quad.id))
             return false;
         return true;
     });
-    const std::vector<tile::Id> all_quads = tiles_for_current_camera_position();
-    std::vector<tile::Id> generatable_quads;
-    std::copy_if(all_quads.begin(), all_quads.end(), std::back_inserter(generatable_quads), [](const tile::Id& tile_id) {
-        /// TODO: return true if generatable
+
+    // List all required quads for the current camera position
+    const std::vector<tile::Id> quad_ids_required_by_camera = tiles_for_current_camera_position();
+
+    // A quad becomes gpu candidate if it is not on gpu already
+    std::vector<tile::Id> gpu_candidates_ids;
+    std::copy_if(
+        quad_ids_required_by_camera.begin(), quad_ids_required_by_camera.end(), std::back_inserter(gpu_candidates_ids), [this](const tile::Id& quad_id) {
+            if (m_gpu_cached.contains(quad_id))
+                return false;
+            return true;
+        });
+
+    // Only keep quads >= max zoom in gpu_candidates if they can be generated from a tile at max zoom level in the ram cache!
+    std::erase_if(gpu_candidates_ids, [this](const tile::Id& quad_id) {
+        if (quad_id.zoom_level >= m_max_zoom_level) {
+            tile::Id parent_quad_id = find_parent_quad_and_child_id_at_zoom_level(quad_id, m_max_zoom_level - 1).first;
+            if (!m_ram_cache.contains(parent_quad_id))
+                return true;
+        }
         return false;
     });
 
-    std::vector<tile::Id> gpu_candidates;
-    std::copy_if(generatable_quads.begin(), generatable_quads.end(), std::back_inserter(gpu_candidates), [this](const tile::Id& tile_id) {
-        if (m_gpu_cached.contains(tile_id))
-            return false;
-        return true;
-    });
-
-    for (const auto& q : gpu_candidates) {
-        m_gpu_cached.insert(tile_types::GpuCacheInfo { q });
+    // get all gpu candidates < max zoom level from the ram cache (if available there) and create dummys for those >= max zoom level
+    std::vector<tile_types::EawsQuad> gpu_candidates;
+    for (const tile::Id& gpu_candidate_quad_id : gpu_candidates_ids) {
+        // if quad >= max zoom: register quad with no data as gpu candidate
+        if (gpu_candidate_quad_id.zoom_level >= m_max_zoom_level) {
+            tile_types::EawsQuad quad(gpu_candidate_quad_id);
+            for (uint i = 0; i < quad.tiles.size(); i++) {
+                quad.tiles[i] = tile_types::TileLayer {
+                    .id = gpu_candidate_quad_id.children()[i],
+                    .network_info = tile_types::NetworkInfo { tile_types::NetworkInfo::Status::Good, utils::time_since_epoch() },
+                    .data = std::shared_ptr<QByteArray>(nullptr),
+                };
+            }
+            quad.n_tiles = quad.tiles.size();
+            gpu_candidates.push_back(quad);
+        } else if (m_ram_cache.contains(gpu_candidate_quad_id)) // below max zoom eaws tiles are stored in ram cache
+            gpu_candidates.push_back(m_ram_cache.peak_at(gpu_candidate_quad_id));
     }
 
-    m_gpu_cached.visit([&should_refine](const tile_types::GpuCacheInfo& quad) {
-        return should_refine(quad.id);
-    });
-
-    const auto superfluous_quads = m_gpu_cached.purge(m_gpu_quad_limit);
+    // Register all ids that will be pushed to gpu as being in gpu cache
+    for (const auto& q : gpu_candidates) {
+        m_gpu_cached.insert(tile_types::GpuCacheInfo { q.id });
+    }
+    m_gpu_cached.visit([&should_refine](const tile_types::GpuCacheInfo& quad) { return should_refine(quad.id); });
 
     // elimitate double entries (happens when the gpu has not enough space for all quads selected above)
+    const auto superfluous_quads = m_gpu_cached.purge(m_gpu_quad_limit);
     std::unordered_set<tile::Id, tile::Id::Hasher> superfluous_ids;
     superfluous_ids.reserve(superfluous_quads.size());
     for (const auto& quad : superfluous_quads)
         superfluous_ids.insert(quad.id);
-
     std::erase_if(gpu_candidates, [&superfluous_ids](const auto& quad) {
         if (superfluous_ids.contains(quad.id)) {
             superfluous_ids.erase(quad.id);
@@ -214,22 +235,25 @@ void SchedulerEaws::update_gpu_quads()
         return false;
     });
 
+    // Create rasters for new gpu quads to be stored and used on gpu
     std::vector<tile_types::GpuEawsQuad> new_gpu_quads;
-    new_gpu_quads.reserve(gpu_candidates.size());
-    std::transform(gpu_candidates.cbegin(), gpu_candidates.cend(), std::back_inserter(new_gpu_quads), [this](const tile_types::EawsQuad& quad) {
-        // create GpuQuad based on cpu quad
+    new_gpu_quads.reserve(gpu_candidates_ids.size());
+    std::transform(gpu_candidates.cbegin(), gpu_candidates.cend(), std::back_inserter(new_gpu_quads), [this](const tile_types::EawsQuad& cpu_quad) {
+        // create GpuQuad based on cpu quad or create it if it is >= zoom level
         tile_types::GpuEawsQuad gpu_quad;
-        gpu_quad.id = quad.id;
-        assert(quad.n_tiles == 4);
+        gpu_quad.id = cpu_quad.id;
+        assert(cpu_quad.n_tiles == 4);
         for (unsigned i = 0; i < 4; ++i) {
-            gpu_quad.tiles[i].id = quad.tiles[i].id;
+            gpu_quad.tiles[i].id = cpu_quad.tiles[i].id;
             nucleus::Raster<uint16_t> raster(glm::uvec2(m_tile_size, m_tile_size), 0);
-            if (quad.tiles[i].id.zoom_level > m_max_zoom_level)
-                raster = interpolate_tile(quad.tiles[i].id);
-            else if (quad.tiles[i].data->size() > 0) {
-                const auto* eaws_data = quad.tiles[i].data.get();
-                tl::expected<avalanche::eaws::RegionTile, QString> result = avalanche::eaws::vector_tile_reader(*eaws_data, quad.tiles[i].id);
-                raster = avalanche::eaws::rasterize_regions(result.value(), &m_eaws_uint_id_manager, m_tile_size, m_tile_size, quad.tiles[i].id);
+            if (cpu_quad.tiles[i].id.zoom_level > m_max_zoom_level)
+                raster = rasterize_from_max_zoom_tile(cpu_quad.tiles[i].id);
+            else if (cpu_quad.tiles[i].data->size() > 0) {
+                const auto* eaws_data = cpu_quad.tiles[i].data.get();
+                tl::expected<avalanche::eaws::RegionTile, QString> result = avalanche::eaws::vector_tile_reader(*eaws_data, cpu_quad.tiles[i].id);
+                assert(result.has_value());
+                avalanche::eaws::RegionTile region_tile = result.value();
+                raster = avalanche::eaws::rasterize_regions(region_tile, &m_eaws_uint_id_manager, m_tile_size, m_tile_size, cpu_quad.tiles[i].id);
             }
             gpu_quad.tiles[i].raster = std::make_shared<nucleus::Raster<uint16_t>>(std::move(raster));
         }
@@ -246,7 +270,7 @@ void SchedulerEaws::send_quad_requests()
         return;
     auto currently_active_tiles = tiles_for_current_camera_position();
 
-    // Remove tiles that  already in cache and not expired
+    // Remove tiles that are already in cache and not expired
     const auto current_time = utils::time_since_epoch();
     std::erase_if(currently_active_tiles, [this, current_time](const tile::Id& id) {
         return m_ram_cache.contains(id) && m_ram_cache.peak_at(id).network_info().timestamp + m_retirement_age_for_tile_cache > current_time;
@@ -254,40 +278,18 @@ void SchedulerEaws::send_quad_requests()
 
     // Check which tiles have a zoom level higher than what the server can provide and send those to be interpolated from existing tiles
     std::vector<tile::Id> fetch_these_quads_from_server;
-    std::vector<tile::Id> interpolate_these;
-
-    std::for_each(currently_active_tiles.begin(), currently_active_tiles.end(),
-        [this, current_time, &fetch_these_quads_from_server, &interpolate_these](const tile::Id& id) {
-            if (!m_ram_cache.contains(id) || m_ram_cache.peak_at(id).network_info().timestamp + m_retirement_age_for_tile_cache <= current_time) {
-                // this tile is not available in the cache, decide how to generate it:
-                if (id.zoom_level > m_max_zoom_level)
-                    interpolate_these.push_back(id);
-                else
-                    fetch_these_quads_from_server.push_back(id);
+    std::for_each(currently_active_tiles.begin(), currently_active_tiles.end(), [this, current_time, &fetch_these_quads_from_server](const tile::Id& id) {
+        if (id.zoom_level < m_max_zoom_level // child tiles of quad can be served by tile server
+            && (!m_ram_cache.contains(id) || m_ram_cache.peak_at(id).network_info().timestamp + m_retirement_age_for_tile_cache <= current_time))
+            fetch_these_quads_from_server.push_back(id);
+        else {
+            tile::Id parent_quad_id = find_parent_quad_and_child_id_at_zoom_level(id, m_max_zoom_level - 1).first;
+            if (!m_ram_cache.contains(parent_quad_id)) {
+                fetch_these_quads_from_server.push_back(parent_quad_id);
             }
-        });
-    emit quads_requested(fetch_these_quads_from_server);
-    // emit quads_without_data_requested(interpolate_these);
-}
-
-void SchedulerEaws::create_quads_without_data(const std::vector<tile::Id>& input_tile_ids)
-{
-    // Only create empty quads above maximum zoom level.
-    // These will be substituted by an interpolation later when gpu quads are built, thus they get nullptr as data attribute
-    // thus we have to wait until at least tile 0 is in Cache
-    if (m_ram_cache.contains(tile::Id(0, glm::uvec2(0, 0), tile::Scheme::SlippyMap))) {
-        for (const tile::Id& quad_id : input_tile_ids) {
-            assert(quad_id.zoom_level > m_max_zoom_level);
-            tile_types::EawsQuad new_eaws_quad;
-            new_eaws_quad.n_tiles = 4;
-            new_eaws_quad.id = quad_id;
-            tile_types::NetworkInfo network_info({ tile_types::NetworkInfo::Status::Good, utils::time_since_epoch() });
-            for (uint i = 0; i < 4; i++) {
-                new_eaws_quad.tiles[i] = tile_types::TileLayer({ quad_id.children()[i], network_info, std::shared_ptr<QByteArray>(nullptr) });
-            }
-            emit quad_above_zoom_level_created(new_eaws_quad);
         }
-    }
+    });
+    emit quads_requested(fetch_these_quads_from_server);
 }
 
 void SchedulerEaws::purge_ram_cache()
@@ -367,7 +369,7 @@ void SchedulerEaws::read_disk_cache()
 std::vector<tile::Id> SchedulerEaws::tiles_for_current_camera_position() const
 {
     std::vector<tile::Id> all_inner_nodes;
-    const auto all_leaves = quad_tree::onTheFlyTraverse(tile::Id { 0, { 0, 0 }, tile::Scheme::SlippyMap },
+    const auto all_leaves = quad_tree::onTheFlyTraverse(tile::Id { 0, { 0, 0 } },
         tile_scheduler::utils::refineFunctor(m_current_camera, m_aabb_decorator, m_permissible_screen_space_error, m_tile_size),
         [&all_inner_nodes](const tile::Id& v) {
             all_inner_nodes.push_back(v);

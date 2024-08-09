@@ -323,8 +323,7 @@ void Cache<T>::visit(const VisitorFunction& functor)
     auto locker = std::scoped_lock(m_data_mutex);
     const auto visited = utils::time_since_epoch();
     static_assert(requires { { functor(T()) } -> utils::convertible_to<bool>; }, "VisitorFunction must accept a const NamedTile and return a bool.");
-    const tile::Scheme tile_scheme = !m_data.empty() ? m_data.begin()->first.scheme : tile::Scheme::Tms;
-    const auto root = tile::Id { 0, { 0, 0 }, tile_scheme };
+    const auto root = tile::Id { 0, { 0, 0 } };
     visit(root, functor, visited);
 }
 
