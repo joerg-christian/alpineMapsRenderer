@@ -142,6 +142,8 @@ Controller::Controller(AbstractRenderWindow* render_window)
         QNetworkInformation* n = QNetworkInformation::instance();
         m_tile_scheduler->set_network_reachability(n->reachability());
         connect(n, &QNetworkInformation::reachabilityChanged, m_tile_scheduler.get(), &Scheduler::set_network_reachability);
+        m_tile_scheduler_eaws->set_network_reachability(n->reachability());
+        connect(n, &QNetworkInformation::reachabilityChanged, m_tile_scheduler_eaws.get(), &SchedulerEaws::set_network_reachability);
     }
 
 #ifdef ALP_ENABLE_THREADING
