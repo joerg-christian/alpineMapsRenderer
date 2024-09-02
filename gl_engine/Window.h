@@ -77,6 +77,8 @@ public slots:
     void update_camera(const nucleus::camera::Definition& new_definition) override;
     void update_debug_scheduler_stats(const QString& stats) override;
     void update_gpu_quads(const std::vector<nucleus::tile_scheduler::tile_types::GpuTileQuad>& new_quads, const std::vector<tile::Id>& deleted_quads) override;
+    void update_gpu_eaws_quads(
+        const std::vector<nucleus::tile_scheduler::tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads) override;
     void shared_config_changed(gl_engine::uboSharedConfig ubo);
     void reload_shader();
 

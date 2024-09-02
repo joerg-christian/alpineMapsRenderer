@@ -260,7 +260,7 @@ void SchedulerEaws::update_gpu_quads()
         return gpu_quad;
     });
 
-    emit gpu_quads_updated(new_gpu_quads, { superfluous_ids.cbegin(), superfluous_ids.cend() });
+    emit gpu_eaws_quads_updated(new_gpu_quads, { superfluous_ids.cbegin(), superfluous_ids.cend() });
     update_stats();
 }
 

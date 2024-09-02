@@ -23,8 +23,12 @@
 #include "tile_id.glsl"
 
 uniform lowp sampler2DArray ortho_sampler;
+uniform mediump usampler2DArray eaws_region_sampler;
 uniform highp usampler2D height_texture_layer_map_sampler;
 uniform highp usampler2D tile_id_map_sampler;
+uniform highp usampler2D eaws_texture_layer_map_sampler;
+uniform highp usampler2D tile_id_map_sampler_eaws;
+
 
 layout (location = 0) out lowp vec3 texout_albedo;
 layout (location = 1) out highp vec4 texout_position;
@@ -74,6 +78,16 @@ void main() {
     // highp vec3 fragColor = vec3(0.0, texture_layer_f, 0.0);
     fragColor = mix(fragColor, conf.material_color.rgb, conf.material_color.a);
     texout_albedo = fragColor;
+
+    // eaws
+    highp uint hash_eaws = hash_tile_id(tile_id);
+    while(texelFetch(tile_id_map_sampler_eaws, ivec2(int(hash_eaws & 255u), int(hash_eaws >> 8u)), 0).xy != packed_tile_id)
+        hash_eaws++;
+    highp float eaws_texture_layer_f = float(texelFetch(eaws_texture_layer_map_sampler, ivec2(int(hash_eaws & 255u), int(hash_eaws >> 8u)), 0).x);
+    eaws_texture_layer_f = float(gl_FragCoord.x);
+    float region_id = texture(eaws_region_sampler, vec3(uv, eaws_texture_layer_f)).r;
+
+    if(float(region_id) != 0) texout_albedo = vec3(1,0,0); // 598 is the highest eaws region id
 
     // Write Position (and distance) in gbuffer
     highp float dist = length(var_pos_cws);

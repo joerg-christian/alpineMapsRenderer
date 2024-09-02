@@ -84,7 +84,7 @@ signals:
     void quad_received(const tile::Id& ids);
     void quads_requested(const std::vector<tile::Id>& ids);
     void quads_without_data_requested(const std::vector<tile::Id>& ids);
-    void gpu_quads_updated(const std::vector<tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads); // eaws updated
+    void gpu_eaws_quads_updated(const std::vector<tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads); // eaws updated
 
 public slots:
     void update_camera(const nucleus::camera::Definition& camera);

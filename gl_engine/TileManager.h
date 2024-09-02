@@ -49,6 +49,11 @@ class TileManager : public QObject {
         unsigned height_texture_layer = unsigned(-1);
     };
 
+    struct EawsTileInfo {
+        tile::Id tile_id = {};
+        unsigned eaws_texture_layer = unsigned(-1);
+    };
+
 public:
     explicit TileManager(QObject* parent = nullptr);
     void init(); // needs OpenGL context
@@ -61,24 +66,33 @@ public:
 
 public slots:
     void update_gpu_quads(const std::vector<nucleus::tile_scheduler::tile_types::GpuTileQuad>& new_quads, const std::vector<tile::Id>& deleted_quads);
+    void update_gpu_eaws_quads(const std::vector<nucleus::tile_scheduler::tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads);
     void initilise_attribute_locations(ShaderProgram* program);
     void set_aabb_decorator(const nucleus::tile_scheduler::utils::AabbDecoratorPtr& new_aabb_decorator);
     void set_quad_limit(unsigned new_limit);
 
 private:
     void remove_tile(const tile::Id& tile_id);
+    void remove_eaws_tile(const tile::Id& tile_id);
     void add_tile(const tile::Id& id, tile::SrsAndHeightBounds bounds, const nucleus::utils::ColourTexture& ortho, const nucleus::Raster<uint16_t>& heights);
+    void add_eaws_tile(const tile::Id& id, const nucleus::Raster<uint16_t>& eaws_region_raster);
     void update_gpu_id_map();
+    void update_gpu_id_map_eaws();
 
     static constexpr auto N_EDGE_VERTICES = 65;
     static constexpr auto ORTHO_RESOLUTION = 256;
     static constexpr auto HEIGHTMAP_RESOLUTION = 65;
+    static constexpr auto EAWS_REGION_RESOLUTION = 256;
 
     std::vector<tile::Id> m_loaded_tiles;
+    std::vector<tile::Id> m_loaded_eaws_tiles;
     std::unique_ptr<Texture> m_ortho_textures;
     std::unique_ptr<Texture> m_heightmap_textures;
+    std::unique_ptr<Texture> m_eaws_regions_textures;
     std::unique_ptr<Texture> m_tile_id_map_texture;
+    std::unique_ptr<Texture> m_tile_id_map_texture_eaws;
     std::unique_ptr<Texture> m_texture_id_map_texture;
+    std::unique_ptr<Texture> m_texture_id_map_texture_eaws;
     std::unique_ptr<QOpenGLVertexArrayObject> m_vao;
     std::pair<std::unique_ptr<QOpenGLBuffer>, size_t> m_index_buffer;
     std::unique_ptr<QOpenGLBuffer> m_bounds_buffer;
@@ -86,6 +100,7 @@ private:
     std::unique_ptr<QOpenGLBuffer> m_height_texture_layer_buffer;
 
     std::vector<TileInfo> m_gpu_tiles;
+    std::map<tile::Id, EawsTileInfo> m_gpu_eaws_tiles;
     unsigned m_tiles_per_set = 1;
     nucleus::tile_scheduler::DrawListGenerator m_draw_list_generator;
     const nucleus::tile_scheduler::DrawListGenerator::TileSet m_last_draw_list; // buffer last generated draw list

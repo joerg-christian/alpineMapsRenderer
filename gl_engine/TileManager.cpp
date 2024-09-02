@@ -87,11 +87,21 @@ void TileManager::init()
     m_heightmap_textures->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
     m_heightmap_textures->allocate_array(HEIGHTMAP_RESOLUTION, HEIGHTMAP_RESOLUTION, unsigned(m_loaded_tiles.size()));
 
+    m_eaws_regions_textures = std::make_unique<Texture>(Texture::Target::_2dArray, Texture::Format::R16UI);
+    m_eaws_regions_textures->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
+    m_eaws_regions_textures->allocate_array(EAWS_REGION_RESOLUTION, EAWS_REGION_RESOLUTION, unsigned(m_loaded_eaws_tiles.size()));
+
     m_tile_id_map_texture = std::make_unique<Texture>(Texture::Target::_2d, Texture::Format::RG32UI);
     m_tile_id_map_texture->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
 
+    m_tile_id_map_texture_eaws = std::make_unique<Texture>(Texture::Target::_2d, Texture::Format::RG32UI);
+    m_tile_id_map_texture_eaws->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
+
     m_texture_id_map_texture = std::make_unique<Texture>(Texture::Target::_2d, Texture::Format::R16UI);
     m_texture_id_map_texture->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
+
+    m_texture_id_map_texture_eaws = std::make_unique<Texture>(Texture::Target::_2d, Texture::Format::R16UI);
+    m_texture_id_map_texture_eaws->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
 }
 
 const nucleus::tile_scheduler::DrawListGenerator::TileSet TileManager::generate_tilelist(const nucleus::camera::Definition& camera) const {
@@ -111,6 +121,9 @@ void TileManager::draw(ShaderProgram* shader_program, const nucleus::camera::Def
     shader_program->set_uniform("height_sampler", 1);
     shader_program->set_uniform("height_texture_layer_map_sampler", 3);
     shader_program->set_uniform("tile_id_map_sampler", 4);
+    shader_program->set_uniform("eaws_texture_layer_map_sampler", 5);
+    shader_program->set_uniform("tile_id_map_sampler_eaws", 6);
+    shader_program->set_uniform("eaws_region_sampler", 7);
 
     // Sort depending on distance to sort_position
     std::vector<std::pair<float, const TileInfo*>> tile_list;
@@ -131,6 +144,9 @@ void TileManager::draw(ShaderProgram* shader_program, const nucleus::camera::Def
     m_heightmap_textures->bind(1);
     m_texture_id_map_texture->bind(3);
     m_tile_id_map_texture->bind(4);
+    m_texture_id_map_texture_eaws->bind(5);
+    m_tile_id_map_texture_eaws->bind(6);
+    m_eaws_regions_textures->bind(7);
     m_vao->bind();
 
     std::vector<glm::vec4> bounds;
@@ -142,12 +158,17 @@ void TileManager::draw(ShaderProgram* shader_program, const nucleus::camera::Def
     std::vector<int32_t> height_texture_layer;
     height_texture_layer.reserve(tile_list.size());
 
+    std::vector<int32_t> eaws_texture_layer;
+    eaws_texture_layer.reserve(tile_list.size());
+
     for (const auto& tileset : tile_list) {
         bounds.emplace_back(tileset.second->bounds.min.x - camera.position().x, tileset.second->bounds.min.y - camera.position().y,
             tileset.second->bounds.max.x - camera.position().x, tileset.second->bounds.max.y - camera.position().y);
 
         packed_id.emplace_back(nucleus::srs::pack(tileset.second->tile_id));
         height_texture_layer.emplace_back(tileset.second->height_texture_layer);
+        if (m_gpu_eaws_tiles.contains(tileset.second->tile_id))
+            eaws_texture_layer.emplace_back(m_gpu_eaws_tiles.at(tileset.second->tile_id).eaws_texture_layer);
     }
 
     m_bounds_buffer->bind();
@@ -179,6 +200,21 @@ void TileManager::remove_tile(const tile::Id& tile_id)
     const auto found_tile = std::find_if(m_gpu_tiles.begin(), m_gpu_tiles.end(), [&tile_id](const TileInfo& tileset) { return tileset.tile_id == tile_id; });
     if (found_tile != m_gpu_tiles.end())
         m_gpu_tiles.erase(found_tile);
+}
+
+void TileManager::remove_eaws_tile(const tile::Id& tile_id)
+{
+    if (!QOpenGLContext::currentContext()) // can happen during shutdown.
+        return;
+
+    const auto t = std::find(m_loaded_eaws_tiles.begin(), m_loaded_eaws_tiles.end(), tile_id);
+    assert(t != m_loaded_eaws_tiles.end()); // removing a tile that's not here. likely there is a race.
+    *t = tile::Id { unsigned(-1), {} };
+    // Note: Here we do not have to call an equivalent of m_draw_list_generator.remove_tile(tile_id);
+
+    // clear slot
+    // or remove from list and free resources
+    m_gpu_eaws_tiles.erase(tile_id);
 }
 
 void TileManager::initilise_attribute_locations(ShaderProgram* program)
@@ -221,6 +257,8 @@ void TileManager::set_quad_limit(unsigned int new_limit)
 {
     m_loaded_tiles.resize(new_limit * 4);
     std::fill(m_loaded_tiles.begin(), m_loaded_tiles.end(), tile::Id { unsigned(-1), {} });
+    m_loaded_eaws_tiles.resize(new_limit * 4);
+    std::fill(m_loaded_eaws_tiles.begin(), m_loaded_eaws_tiles.end(), tile::Id { unsigned(-1), {} });
 }
 
 void TileManager::add_tile(
@@ -247,6 +285,28 @@ void TileManager::add_tile(
     m_draw_list_generator.add_tile(id);
 }
 
+void TileManager::add_eaws_tile(const tile::Id& id, const nucleus::Raster<uint16_t>& eaws_raster)
+{
+    if (!QOpenGLContext::currentContext()) // can happen during shutdown.
+        return;
+
+    EawsTileInfo tileinfo;
+    tileinfo.tile_id = id;
+
+    // find empty spot and upload texture
+    const auto t = std::find(m_loaded_eaws_tiles.begin(), m_loaded_eaws_tiles.end(), tile::Id { unsigned(-1), {} });
+    assert(t != m_loaded_eaws_tiles.end());
+    *t = id;
+    const auto layer_index = unsigned(t - m_loaded_eaws_tiles.begin());
+    tileinfo.eaws_texture_layer = layer_index;
+
+    nucleus::Raster<uint16_t> raster = eaws_raster;
+    if (EAWS_REGION_RESOLUTION != eaws_raster.height() || EAWS_REGION_RESOLUTION != eaws_raster.width())
+        raster = nucleus::Raster<uint16_t>(glm::uvec2(EAWS_REGION_RESOLUTION, EAWS_REGION_RESOLUTION), eaws_raster.pixel(glm::uvec2(0, 0)));
+    m_eaws_regions_textures->upload(raster, layer_index);
+    m_gpu_eaws_tiles[tileinfo.tile_id] = tileinfo;
+}
+
 void TileManager::update_gpu_id_map()
 {
     const auto hash_to_pixel = [](uint16_t hash) { return glm::uvec2(hash & 255, hash >> 8); };
@@ -262,6 +322,24 @@ void TileManager::update_gpu_id_map()
     }
     m_texture_id_map_texture->upload(texture_ids);
     m_tile_id_map_texture->upload(packed_ids);
+}
+
+void TileManager::update_gpu_id_map_eaws()
+{
+    const auto hash_to_pixel = [](uint16_t hash) { return glm::uvec2(hash & 255, hash >> 8); };
+    nucleus::Raster<glm::u32vec2> eaws_packed_ids({ 256, 256 }, glm::u32vec2(-1, -1));
+    nucleus::Raster<uint16_t> eaws_texture_ids({ 256, 256 }, 0);
+    for (const auto tuple : m_gpu_eaws_tiles) {
+        auto tile_id = tuple.first;
+        auto hash = nucleus::srs::hash_uint16(tile_id); // tuple.first= tile_id
+        while (eaws_packed_ids.pixel(hash_to_pixel(hash)) != glm::u32vec2(-1, -1))
+            hash++;
+
+        eaws_packed_ids.pixel(hash_to_pixel(hash)) = nucleus::srs::pack(tile_id);
+        eaws_texture_ids.pixel(hash_to_pixel(hash)) = tuple.second.eaws_texture_layer;
+    }
+    m_texture_id_map_texture_eaws->upload(eaws_texture_ids);
+    m_tile_id_map_texture_eaws->upload(eaws_packed_ids);
 }
 
 void TileManager::set_permissible_screen_space_error(float new_permissible_screen_space_error)
@@ -286,4 +364,22 @@ void TileManager::update_gpu_quads(const std::vector<nucleus::tile_scheduler::ti
         }
     }
     update_gpu_id_map();
+}
+
+void TileManager::update_gpu_eaws_quads(
+    const std::vector<nucleus::tile_scheduler::tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads)
+{
+    for (const auto& quad : deleted_quads) {
+        for (const auto& id : quad.children()) {
+            remove_eaws_tile(id);
+        }
+    }
+    for (const auto& quad : new_quads) {
+        for (const auto& tile : quad.tiles) {
+            // test for validity
+            assert(tile.id.zoom_level < 100);
+            add_eaws_tile(tile.id, *tile.raster);
+        }
+    }
+    update_gpu_id_map_eaws();
 }

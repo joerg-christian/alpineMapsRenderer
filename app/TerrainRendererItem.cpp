@@ -151,7 +151,7 @@ QQuickFramebufferObject::Renderer* TerrainRendererItem::createRenderer() const
     connect(r->glWindow(), &gl_engine::Window::report_measurements, this->m_timer_manager, &TimerFrontendManager::receive_measurements);
 
     connect(tile_scheduler, &nucleus::tile_scheduler::Scheduler::gpu_quads_updated, RenderThreadNotifier::instance(), &RenderThreadNotifier::notify);
-    connect(tile_scheduler_eaws, &nucleus::tile_scheduler::SchedulerEaws::gpu_quads_updated, RenderThreadNotifier::instance(), &RenderThreadNotifier::notify);
+    connect(tile_scheduler_eaws, &nucleus::tile_scheduler::SchedulerEaws::gpu_eaws_quads_updated, RenderThreadNotifier::instance(), &RenderThreadNotifier::notify);
     // We now have to initialize everything based on the url, but we need to do this on the thread this instance
     // belongs to. (gui thread?) Therefore we use the following signal to signal the init process
     emit init_after_creation();

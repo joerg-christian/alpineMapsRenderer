@@ -390,6 +390,12 @@ void Window::update_gpu_quads(const std::vector<nucleus::tile_scheduler::tile_ty
     m_map_label_manager->update_gpu_quads(new_quads, deleted_quads);
 }
 
+void Window::update_gpu_eaws_quads(const std::vector<nucleus::tile_scheduler::tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads)
+{
+    assert(m_tile_manager);
+    m_tile_manager->update_gpu_eaws_quads(new_quads, deleted_quads);
+}
+
 float Window::depth(const glm::dvec2& normalised_device_coordinates)
 {
     const auto read_float = nucleus::utils::bit_coding::to_f16f16(m_gbuffer->read_colour_attachment_pixel<glm::u8vec4>(3, normalised_device_coordinates))[0];
