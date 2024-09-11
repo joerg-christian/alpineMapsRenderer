@@ -128,6 +128,7 @@ static_assert(NamedTile<GpuLayeredTile>);
 
 struct GpuEawsTile {
     tile::Id id;
+    tile::SrsAndHeightBounds bounds = {};
     std::shared_ptr<const nucleus::Raster<uint16_t>> raster;
 };
 static_assert(NamedTile<GpuEawsTile>);

@@ -39,6 +39,7 @@ ShaderManager::ShaderManager()
     m_track_program = std::make_unique<ShaderProgram>("track.vert", "track.frag");
     m_labels_program = std::make_unique<ShaderProgram>("labels.vert", "labels.frag");
     m_labels_picker_program = std::make_unique<ShaderProgram>("labels.vert", "labels_picker.frag");
+    m_avalanche_warning_layer_program = std::make_unique<ShaderProgram>("eaws.vert", "eaws.frag");
 
     m_program_list.push_back(m_tile_program.get());
     m_program_list.push_back(m_screen_copy.get());
@@ -50,6 +51,7 @@ ShaderManager::ShaderManager()
     m_program_list.push_back(m_track_program.get());
     m_program_list.push_back(m_labels_program.get());
     m_program_list.push_back(m_labels_picker_program.get());
+    m_program_list.push_back(m_avalanche_warning_layer_program.get());
 }
 
 ShaderManager::~ShaderManager() = default;
@@ -57,6 +59,7 @@ ShaderManager::~ShaderManager() = default;
 void ShaderManager::release()
 {
     m_tile_program->release();
+    m_avalanche_warning_layer_program->release();
 }
 
 void ShaderManager::reload_shaders()

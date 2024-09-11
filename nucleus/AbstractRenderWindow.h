@@ -64,6 +64,7 @@ public slots:
     virtual void update_labels(const nucleus::vector_tile::PointOfInterestTileCollection& points_of_interest, const std::vector<tile::Id>& removed_tiles) = 0;
 #endif
     virtual void pick_value(const glm::dvec2& screen_space_coordinates) = 0;
+    virtual void update_gpu_eaws_quads(const std::vector<tile_scheduler::tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads) = 0;
 
 signals:
     void update_requested();

@@ -27,7 +27,6 @@
 #include <QTimer>
 
 #include "nucleus/tile_scheduler/utils.h"
-#include "nucleus/vector_tiles/VectorTileManager.h"
 #include "radix/quad_tree.h"
 
 #include "nucleus/DataQuerier.h"
@@ -245,6 +244,7 @@ void SchedulerEaws::update_gpu_quads()
         assert(cpu_quad.n_tiles == 4);
         for (unsigned i = 0; i < 4; ++i) {
             gpu_quad.tiles[i].id = cpu_quad.tiles[i].id;
+            gpu_quad.tiles[i].bounds = m_aabb_decorator->aabb(cpu_quad.tiles[i].id);
             nucleus::Raster<uint16_t> raster(glm::uvec2(m_tile_size, m_tile_size), 0);
             if (cpu_quad.tiles[i].id.zoom_level > m_max_zoom_level)
                 raster = rasterize_from_max_zoom_tile(cpu_quad.tiles[i].id);

@@ -49,7 +49,6 @@
 #include <nucleus/timing/CpuTimer.h>
 #include <nucleus/timing/TimerManager.h>
 #include <nucleus/utils/bit_coding.h>
-
 #include "Context.h"
 #include "Framebuffer.h"
 #include "SSAO.h"
@@ -81,6 +80,7 @@ Window::Window()
     m_map_label_manager = std::make_unique<MapLabelManager>();
 #endif
     QTimer::singleShot(1, [this]() { emit update_requested(); });
+    m_avalanche_warning_layer = std::make_unique<AvalancheWarningLayer>();
 }
 
 Window::~Window()
@@ -110,6 +110,8 @@ void Window::initialise_gpu()
 
     m_tile_manager->init();
     m_tile_manager->initilise_attribute_locations(shader_manager->tile_shader());
+    m_avalanche_warning_layer->init();
+    m_avalanche_warning_layer->initilise_attribute_locations(m_shader_manager->eaws_shader());
     m_screen_quad_geometry = gl_engine::helpers::create_screen_quad_geometry();
     // NOTE to position buffer: The position can not be recalculated by depth alone. (given the numerical resolution of the depth buffer and
     // our massive view spektrum). ReverseZ would be an option but isnt possible on WebGL and OpenGL ES (since their depth buffer is aligned from -1...1)
@@ -282,6 +284,10 @@ void Window::paint(QOpenGLFramebufferObject* framebuffer)
     m_timer->stop_timer("tiles");
     shader_manager->tile_shader()->release();
 
+    // Draw Eaws Regions
+    m_shader_manager->eaws_shader()->bind();
+    m_avalanche_warning_layer->draw(m_shader_manager->tile_shader(), m_camera, culled_tile_set, true, m_camera.position());
+    m_shader_manager->eaws_shader()->release();
     m_gbuffer->unbind();
 
     shader_manager->tile_shader()->release();
@@ -422,9 +428,17 @@ void Window::updateCameraEvent()
     emit update_camera_requested();
 }
 
-void Window::set_permissible_screen_space_error(float new_error) { m_tile_manager->set_permissible_screen_space_error(new_error); }
+void Window::set_permissible_screen_space_error(float new_error)
+{
+    m_tile_manager->set_permissible_screen_space_error(new_error);
+    m_avalanche_warning_layer->set_permissible_screen_space_error(new_error);
+}
 
-void Window::set_quad_limit(unsigned int new_limit) { m_tile_manager->set_quad_limit(new_limit); }
+void Window::set_quad_limit(unsigned int new_limit)
+{
+    m_tile_manager->set_quad_limit(new_limit);
+    m_avalanche_warning_layer->set_quad_limit(new_limit);
+}
 
 void Window::update_camera(const nucleus::camera::Definition& new_definition)
 {
@@ -453,6 +467,12 @@ void Window::update_labels(const nucleus::vector_tile::PointOfInterestTileCollec
 }
 #endif
 
+void Window::update_gpu_eaws_quads(const std::vector<nucleus::tile_scheduler::tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads)
+{
+    assert(m_avalanche_warning_layer);
+    m_avalanche_warning_layer->update_gpu_quads(new_quads, deleted_quads);
+}
+
 float Window::depth(const glm::dvec2& normalised_device_coordinates)
 {
     const auto read_float = nucleus::utils::bit_coding::to_f16f16(m_gbuffer->read_colour_attachment_pixel<glm::u8vec4>(3, normalised_device_coordinates))[0];
@@ -479,12 +499,16 @@ void Window::destroy()
     m_gbuffer.reset();
     m_screen_quad_geometry = {};
     m_map_label_manager.reset();
+    m_avalanche_warning_layer.reset();
 }
 
 void Window::set_aabb_decorator(const nucleus::tile_scheduler::utils::AabbDecoratorPtr& new_aabb_decorator)
 {
     assert(m_tile_manager);
     m_tile_manager->set_aabb_decorator(new_aabb_decorator);
+
+    assert(m_avalanche_warning_layer);
+    m_avalanche_warning_layer->set_aabb_decorator(new_aabb_decorator);
 }
 
 nucleus::camera::AbstractDepthTester* Window::depth_tester() { return this; }

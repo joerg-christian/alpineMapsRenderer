@@ -72,7 +72,6 @@ private:
     std::unique_ptr<tile_scheduler::SchedulerEaws> m_tile_scheduler_eaws; // eaws: new
     std::shared_ptr<DataQuerier> m_data_querier;
     std::unique_ptr<camera::Controller> m_camera_controller;
-    std::unique_ptr<tile_scheduler::TileLoadService> m_vectortile_service;
 
     //
     maplabel::MapLabelFilter* m_label_filter;

@@ -39,6 +39,7 @@
 #include "nucleus/camera/Definition.h"
 #include "nucleus/track/GPX.h"
 
+#include "AvalancheWarningLayer.h"
 #include "nucleus/timing/TimerManager.h"
 
 class QOpenGLTexture;
@@ -78,6 +79,9 @@ public slots:
     void update_camera(const nucleus::camera::Definition& new_definition) override;
     void update_debug_scheduler_stats(const QString& stats) override;
     void update_gpu_quads(const std::vector<nucleus::tile_scheduler::tile_types::GpuTileQuad>& new_quads, const std::vector<tile::Id>& deleted_quads) override;
+    void update_gpu_eaws_quads(
+        const std::vector<nucleus::tile_scheduler::tile_types::GpuEawsQuad>& new_quads, const std::vector<tile::Id>& deleted_quads) override;
+
     void shared_config_changed(gl_engine::uboSharedConfig ubo);
     void reload_shader();
 #ifdef ALP_ENABLE_LABELS
@@ -90,7 +94,10 @@ signals:
 
 private:
     std::unique_ptr<TileManager> m_tile_manager; // needs opengl context
-    std::unique_ptr<MapLabelManager> m_map_label_manager;
+    std::unique_ptr<AvalancheWarningLayer> m_avalanche_warning_layer; // needs opengl context
+
+    std::unique_ptr<ShaderManager> m_shader_manager;
+    std::shared_ptr<MapLabelManager> m_map_label_manager; // needs to be shared_ptr since we are using "connect"
 
     std::unique_ptr<Framebuffer> m_gbuffer;
     std::unique_ptr<Framebuffer> m_decoration_buffer;

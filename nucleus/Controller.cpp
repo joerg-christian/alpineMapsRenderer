@@ -193,7 +193,7 @@ Controller::Controller(AbstractRenderWindow* render_window)
     connect(m_camera_controller.get(), &nucleus::camera::Controller::definition_changed, m_render_window, &AbstractRenderWindow::update_camera);
 
     connect(m_tile_scheduler.get(), &Scheduler::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_gpu_quads);
-    // connect(m_tile_scheduler_eaws.get(), &SchedulerEaws::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_gpu_eaws_quads);
+    connect(m_tile_scheduler_eaws.get(), &SchedulerEaws::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_gpu_eaws_quads);
     connect(m_tile_scheduler.get(), &Scheduler::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_requested);
     connect(m_tile_scheduler_eaws.get(), &SchedulerEaws::gpu_quads_updated, m_render_window, &AbstractRenderWindow::update_requested);
 
