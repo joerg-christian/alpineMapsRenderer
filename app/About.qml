@@ -19,7 +19,6 @@
 import QtQuick
 import QtQuick.Controls.Material
 import QtQuick.Layouts
-import Alpine
 
 Rectangle {
     id: about_root
@@ -73,8 +72,11 @@ This is an open source application. It is **released** under the GNU General Pub
 The source of elevation and orthographic photo data is [basemap.at](https://basemap.at),
 it is licensed under the Open Government Data Austria license (CC-BY 4.0).
 
+The source of POI feature labels is [openstreetmap.org](https://www.openstreetmap.org/copyright),
+it is licensed under the Open Data Commons Open Database License (ODbL) by the OpenStreetMap Foundation (OSMF).
+
 ## Authors:
-Adam Celarek, Lucas Dworschak, Gerald Kimmersdorfer, Jakob Lindner, Patrick Komon
+Adam Celarek, Lucas Dworschak, Gerald Kimmersdorfer, Jakob Lindner, Patrick Komon, Jakob Maier
 
 ## Impressum:
 Adam Celarek\\

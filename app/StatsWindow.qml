@@ -19,11 +19,9 @@
 import QtQuick
 import QtCharts
 import QtQuick.Controls.Material
-//import QtQuick.Controls.Imagine
 import QtQuick.Layouts
 import QtQuick.Dialogs
-import Alpine
-
+import app
 import "components"
 
 Rectangle {
@@ -305,12 +303,7 @@ Rectangle {
             checkBoxEnabled: true
             CheckBox {
                 text: "Continuous update"
-                id: continuous_update_checkbox
-                onCheckStateChanged: {
-                    console.log("Continuous update: " + checkState)
-                    console.log("map: " + map)
-                    map.continuous_update = checked
-                }
+                ModelBinding on checked { target: map; property: "continuous_update"; default_value: true }
             }
 
             Pane {
@@ -471,8 +464,7 @@ Rectangle {
             ComboBox {
                 Layout.fillWidth: true;
                 model: _positionList    // set in main.cpp
-                currentIndex: 0
-                onCurrentIndexChanged: map.selected_camera_position_index = currentIndex;
+                ModelBinding on currentIndex { target: map; property: "selected_camera_position_index"; default_value: -1 }
             }
         }
         CheckGroup {

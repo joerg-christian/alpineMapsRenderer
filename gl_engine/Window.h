@@ -5,6 +5,7 @@
  * Copyright (C) 2023 Gerald Kimmersdorfer
  * Copyright (C) 2024 Lucas Dworschak
  * Copyright (C) 2024 Patrick Komon
+ * Copyright (C) 2024 Jakob Maier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,18 +37,18 @@
 #include "nucleus/AbstractRenderWindow.h"
 #include "nucleus/camera/AbstractDepthTester.h"
 #include "nucleus/camera/Definition.h"
+#include "nucleus/track/GPX.h"
 
 #include "nucleus/timing/TimerManager.h"
 
 class QOpenGLTexture;
 class QOpenGLShaderProgram;
-class QOpenGLBuffer;
 class QOpenGLVertexArrayObject;
-class TileManager;
-class MapLabelManager;
 
 namespace gl_engine {
 
+class TileManager;
+class MapLabelManager;
 class ShaderManager;
 class Framebuffer;
 class SSAO;
@@ -65,7 +66,7 @@ public:
 
     [[nodiscard]] float depth(const glm::dvec2& normalised_device_coordinates) override;
     [[nodiscard]] glm::dvec3 position(const glm::dvec2& normalised_device_coordinates) override;
-    void deinit_gpu() override;
+    void destroy() override;
     void set_aabb_decorator(const nucleus::tile_scheduler::utils::AabbDecoratorPtr&) override;
     [[nodiscard]] nucleus::camera::AbstractDepthTester* depth_tester() override;
     [[nodiscard]] nucleus::utils::ColourTexture::Format ortho_tile_compression_algorithm() const override;
@@ -79,18 +80,22 @@ public slots:
     void update_gpu_quads(const std::vector<nucleus::tile_scheduler::tile_types::GpuTileQuad>& new_quads, const std::vector<tile::Id>& deleted_quads) override;
     void shared_config_changed(gl_engine::uboSharedConfig ubo);
     void reload_shader();
+#ifdef ALP_ENABLE_LABELS
+    void update_labels(const nucleus::vector_tile::PointOfInterestTileCollection& visible_features, const std::vector<tile::Id>& removed_tiles) override;
+#endif
+    void pick_value(const glm::dvec2& screen_space_coordinates) override;
 
 signals:
     void report_measurements(QList<nucleus::timing::TimerReport> values);
 
 private:
     std::unique_ptr<TileManager> m_tile_manager; // needs opengl context
-    std::unique_ptr<ShaderManager> m_shader_manager;
-    std::shared_ptr<MapLabelManager> m_map_label_manager; // needs to be shared_ptr since we are using "connect"
+    std::unique_ptr<MapLabelManager> m_map_label_manager;
 
     std::unique_ptr<Framebuffer> m_gbuffer;
     std::unique_ptr<Framebuffer> m_decoration_buffer;
     std::unique_ptr<Framebuffer> m_atmospherebuffer;
+    std::unique_ptr<Framebuffer> m_pickerbuffer;
 
     std::unique_ptr<SSAO> m_ssao;
     std::unique_ptr<ShadowMapping> m_shadowmapping;

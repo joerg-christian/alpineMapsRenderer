@@ -20,21 +20,21 @@
 
 #include "Scheduler.h"
 
-#include <unordered_set>
-
 #include <QBuffer>
 #include <QDebug>
 #include <QNetworkInformation>
 #include <QStandardPaths>
 #include <QTimer>
+#include <nucleus/DataQuerier.h>
+#include <nucleus/tile_scheduler/utils.h>
+#include <nucleus/utils/image_loader.h>
+#include <nucleus/utils/tile_conversion.h>
+#include <radix/quad_tree.h>
+#include <unordered_set>
 
-#include "nucleus/tile_scheduler/utils.h"
-#include "nucleus/utils/image_loader.h"
-#include "nucleus/utils/tile_conversion.h"
-#include "nucleus/vector_tiles/VectorTileManager.h"
-#include "radix/quad_tree.h"
-
-#include "nucleus/DataQuerier.h"
+#ifdef ALP_ENABLE_LABELS
+#include <nucleus/vector_tile/parse.h>
+#endif
 
 using namespace nucleus::tile_scheduler;
 
@@ -178,10 +178,12 @@ void Scheduler::update_gpu_quads()
                            if (quad.tiles[i].ortho->size()) {
                                // Ortho image is available
                                Raster<glm::u8vec4> ortho_raster = nucleus::utils::image_loader::rgba8(*quad.tiles[i].ortho.get());
-                               gpu_quad.tiles[i].ortho = std::make_shared<nucleus::utils::ColourTexture>(ortho_raster, m_ortho_tile_compression_algorithm);
+                               gpu_quad.tiles[i].ortho = std::make_shared<nucleus::utils::MipmappedColourTexture>(
+                                   generate_mipmapped_colour_texture(ortho_raster, m_ortho_tile_compression_algorithm));
                            } else {
                                // Ortho image is not available (use white default tile)
-                               gpu_quad.tiles[i].ortho = std::make_shared<nucleus::utils::ColourTexture>(m_default_ortho_raster, m_ortho_tile_compression_algorithm);
+                               gpu_quad.tiles[i].ortho = std::make_shared<nucleus::utils::MipmappedColourTexture>(
+                                   generate_mipmapped_colour_texture(m_default_ortho_raster, m_ortho_tile_compression_algorithm));
                            }
 
                            if (quad.tiles[i].height->size()) {
@@ -195,11 +197,13 @@ void Scheduler::update_gpu_quads()
                                gpu_quad.tiles[i].height = std::make_shared<nucleus::Raster<uint16_t>>(std::move(heightraster));
                            }
 
+#ifdef ALP_ENABLE_LABELS
                            const auto* vectortile_data = m_default_vector_tile.get();
                            vectortile_data = quad.tiles[i].vector_tile.get();
                            // moved into this if -> since vector_tile might be empty
-                           auto vectortile = nucleus::vectortile::VectorTileManager::to_vector_tile(quad.tiles[i].id, *vectortile_data, m_dataquerier);
-                           gpu_quad.tiles[i].vector_tile = vectortile;
+                           auto pois = nucleus::vector_tile::parse::points_of_interest(*vectortile_data, m_dataquerier.get());
+                           gpu_quad.tiles[i].vector_tile = std::make_shared<vector_tile::PointOfInterestCollection>(std::move(pois));
+#endif
                        }
                        return gpu_quad;
                    });

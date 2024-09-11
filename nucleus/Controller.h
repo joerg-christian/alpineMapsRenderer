@@ -35,6 +35,12 @@ class SchedulerEaws;
 namespace camera {
 class Controller;
 }
+namespace picker {
+class PickerManager;
+}
+namespace maplabel {
+class MapLabelFilter;
+}
 
 class Controller : public QObject {
     Q_OBJECT
@@ -43,9 +49,13 @@ public:
     ~Controller() override;
 
     camera::Controller* camera_controller() const;
+    picker::PickerManager* picker_manager() const;
 
     tile_scheduler::Scheduler* tile_scheduler() const;
     tile_scheduler::SchedulerEaws* tile_scheduler_eaws() const;
+#ifdef ALP_ENABLE_LABELS
+    maplabel::MapLabelFilter* label_filter() const;
+#endif
 
 private:
     AbstractRenderWindow* m_render_window;
@@ -62,5 +72,10 @@ private:
     std::unique_ptr<tile_scheduler::SchedulerEaws> m_tile_scheduler_eaws; // eaws: new
     std::shared_ptr<DataQuerier> m_data_querier;
     std::unique_ptr<camera::Controller> m_camera_controller;
+    std::unique_ptr<tile_scheduler::TileLoadService> m_vectortile_service;
+
+    //
+    maplabel::MapLabelFilter* m_label_filter;
+    nucleus::picker::PickerManager* m_picker_manager;
 };
 }

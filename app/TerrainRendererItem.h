@@ -3,6 +3,7 @@
  * Copyright (C) 2017 Klarälvdalens Datakonsult AB, a KDAB Group company (Giuseppe D'Angelo)
  * Copyright (C) 2023 Adam Celarek
  * Copyright (C) 2023 Gerald Kimmersdorfer
+ * Copyright (C) 2024 Jakob Maier
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,23 +21,28 @@
 
 #pragma once
 
-#include <QQuickFramebufferObject>
-#include <QTimer>
-#include <QList>
-#include <QString>
-#include <QVector3D>
-#include <QVector2D>
 #include <QDateTime>
-#include <map>
+#include <QList>
+#include <QQmlEngine>
+#include <QQuickFramebufferObject>
+#include <QString>
+#include <QVector2D>
+#include <QVector3D>
 
-#include "nucleus/camera/Definition.h"
-#include "nucleus/event_parameter.h"
-#include "gl_engine/UniformBufferObjects.h"
-#include "timing/TimerFrontendManager.h"
+#include <gl_engine/UniformBufferObjects.h>
+#include <nucleus/camera/Definition.h>
+#include <nucleus/event_parameter.h>
+#include <nucleus/map_label/FilterDefinitions.h>
+#include <nucleus/picker/types.h>
+
 #include "AppSettings.h"
+#include "timing/TimerFrontendManager.h"
+
+class QTimer;
 
 class TerrainRendererItem : public QQuickFramebufferObject {
     Q_OBJECT
+    QML_NAMED_ELEMENT(TerrainRenderer)
     Q_PROPERTY(int frame_limit READ frame_limit WRITE set_frame_limit NOTIFY frame_limit_changed)
     Q_PROPERTY(nucleus::camera::Definition camera READ camera NOTIFY camera_changed)
     Q_PROPERTY(int camera_width READ camera_width NOTIFY camera_width_changed)
@@ -47,6 +53,7 @@ class TerrainRendererItem : public QQuickFramebufferObject {
     Q_PROPERTY(bool camera_operation_centre_visibility READ camera_operation_centre_visibility NOTIFY camera_operation_centre_visibility_changed)
     Q_PROPERTY(float camera_operation_centre_distance READ camera_operation_centre_distance NOTIFY camera_operation_centre_distance_changed)
     Q_PROPERTY(gl_engine::uboSharedConfig shared_config READ shared_config WRITE set_shared_config NOTIFY shared_config_changed)
+    Q_PROPERTY(nucleus::maplabel::FilterDefinitions label_filter READ label_filter WRITE set_label_filter NOTIFY label_filter_changed)
     Q_PROPERTY(TimerFrontendManager* timer_manager MEMBER m_timer_manager CONSTANT)
     Q_PROPERTY(AppSettings* settings MEMBER m_settings CONSTANT)
     Q_PROPERTY(unsigned int in_flight_tiles READ in_flight_tiles NOTIFY in_flight_tiles_changed)
@@ -56,6 +63,8 @@ class TerrainRendererItem : public QQuickFramebufferObject {
     Q_PROPERTY(unsigned int selected_camera_position_index MEMBER m_selected_camera_position_index WRITE set_selected_camera_position_index)
     Q_PROPERTY(QVector2D sun_angles READ sun_angles WRITE set_sun_angles NOTIFY sun_angles_changed)
     Q_PROPERTY(bool continuous_update READ continuous_update WRITE set_continuous_update NOTIFY continuous_update_changed)
+    Q_PROPERTY(nucleus::picker::Feature current_feature_data MEMBER m_current_feature_data NOTIFY feature_changed)
+    Q_PROPERTY(QList<QString> current_feature_data_list MEMBER m_current_feature_data_list NOTIFY feature_changed)
 
 public:
     explicit TerrainRendererItem(QQuickItem* parent = 0);
@@ -67,6 +76,7 @@ signals:
     void frame_limit_changed();
 
     void mouse_pressed(const nucleus::event_parameter::Mouse&) const;
+    void mouse_released(const nucleus::event_parameter::Mouse&) const;
     void mouse_moved(const nucleus::event_parameter::Mouse&) const;
     void wheel_turned(const nucleus::event_parameter::Wheel&) const;
     void touch_made(const nucleus::event_parameter::Touch&) const;
@@ -78,6 +88,7 @@ signals:
     void camera_definition_set_by_user(const nucleus::camera::Definition&) const;
 
     void shared_config_changed(gl_engine::uboSharedConfig new_shared_config) const;
+    void label_filter_changed(const nucleus::maplabel::FilterDefinitions label_filter) const;
     void hud_visible_changed(bool new_hud_visible);
 
     void rotation_north_requested();
@@ -113,9 +124,12 @@ signals:
 
     void continuous_update_changed(bool continuous_update);
 
+    void feature_changed();
+
 protected:
     void touchEvent(QTouchEvent*) override;
     void mousePressEvent(QMouseEvent*) override;
+    void mouseReleaseEvent(QMouseEvent*) override;
     void mouseMoveEvent(QMouseEvent*) override;
     void wheelEvent(QWheelEvent*) override;
     void keyPressEvent(QKeyEvent*) override;
@@ -127,13 +141,13 @@ public slots:
     void set_gl_preset(const QString& preset_b64_string);
     void read_global_position(glm::dvec3 latlonalt);
     void camera_definition_changed(const nucleus::camera::Definition& new_definition); // gets called whenever camera changes
+    void change_feature(const nucleus::picker::Feature feature);
 
 private slots:
     void schedule_update();
     void init_after_creation_slot();
     void datetime_changed(const QDateTime& new_datetime);
     void gl_sundir_date_link_changed(bool new_value);
-
 
 public:
     [[nodiscard]] int frame_limit() const;
@@ -165,6 +179,9 @@ public:
 
     gl_engine::uboSharedConfig shared_config() const;
     void set_shared_config(gl_engine::uboSharedConfig new_shared_config);
+
+    nucleus::maplabel::FilterDefinitions label_filter() const;
+    void set_label_filter(nucleus::maplabel::FilterDefinitions new_label_filter);
 
     void set_selected_camera_position_index(unsigned value);
 
@@ -210,7 +227,7 @@ private:
     bool m_camera_operation_centre_visibility = false;
     float m_camera_operation_centre_distance = 1;
     float m_field_of_view = 60;
-    int m_frame_limit = 30;
+    int m_frame_limit = 60;
     unsigned m_tile_cache_size = 12000;
     unsigned m_cached_tiles = 0;
     unsigned m_queued_tiles = 0;
@@ -222,7 +239,11 @@ private:
     unsigned int m_selected_camera_position_index = 0;
     QDateTime m_selected_datetime = QDateTime::currentDateTime();
 
+    nucleus::picker::Feature m_current_feature_data;
+    QList<QString> m_current_feature_data_list;
+
     gl_engine::uboSharedConfig m_shared_config;
+    nucleus::maplabel::FilterDefinitions m_label_filter;
 
     QTimer* m_update_timer = nullptr;
     nucleus::camera::Definition m_camera;

@@ -22,8 +22,11 @@
 
 #include "nucleus/tile_scheduler/utils.h"
 #include "nucleus/utils/ColourTexture.h"
-#include <nucleus/vector_tiles/VectorTileFeature.h>
 #include <radix/tile.h>
+
+#ifdef ALP_ENABLE_LABELS
+#include <nucleus/vector_tile/types.h>
+#endif
 
 class QImage;
 namespace nucleus {
@@ -91,7 +94,7 @@ struct TileQuad {
     NetworkInfo network_info() const {
         return NetworkInfo::join(tiles[0].network_info, tiles[1].network_info, tiles[2].network_info, tiles[3].network_info);
     }
-    static constexpr std::array<char, 25> version_information = {"TileQuad, version 0.3"};
+    static constexpr std::array<char, 25> version_information = { "TileQuad, version 0.5" };
 };
 static_assert(NamedTile<TileQuad>);
 static_assert(SerialisableTile<TileQuad>);
@@ -114,9 +117,12 @@ static_assert(NamedTile<GpuCacheInfo>);
 struct GpuLayeredTile {
     tile::Id id;
     tile::SrsAndHeightBounds bounds = {};
-    std::shared_ptr<const nucleus::utils::ColourTexture> ortho;
+    std::shared_ptr<const nucleus::utils::MipmappedColourTexture> ortho;
     std::shared_ptr<const nucleus::Raster<uint16_t>> height;
-    std::shared_ptr<const nucleus::vectortile::VectorTile> vector_tile;
+
+#ifdef ALP_ENABLE_LABELS
+    vector_tile::PointOfInterestCollectionPtr vector_tile;
+#endif
 };
 static_assert(NamedTile<GpuLayeredTile>);
 
