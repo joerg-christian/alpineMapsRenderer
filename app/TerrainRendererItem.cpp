@@ -40,6 +40,7 @@
 #include "TerrainRenderer.h"
 #include "gl_engine/Window.h"
 #include "nucleus/Controller.h"
+#include "nucleus/avalanche/SchedulerEaws.h"
 #include "nucleus/camera/Controller.h"
 #include "nucleus/camera/PositionStorage.h"
 #include "nucleus/map_label/MapLabelFilter.h"
@@ -58,7 +59,7 @@ struct overloaded : Ts... {
 // explicit deduction guide (not needed as of C++20)
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
-}
+} // namespace
 
 TerrainRendererItem::TerrainRendererItem(QQuickItem* parent)
     : QQuickFramebufferObject(parent)

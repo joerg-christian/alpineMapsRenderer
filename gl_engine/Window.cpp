@@ -46,9 +46,6 @@
 #include <GLES3/gl3.h> // for GL ENUMS! DONT EXACTLY KNOW WHY I NEED THIS HERE! (on other platforms it works without)
 #endif
 
-#include <nucleus/timing/CpuTimer.h>
-#include <nucleus/timing/TimerManager.h>
-#include <nucleus/utils/bit_coding.h>
 #include "Context.h"
 #include "Framebuffer.h"
 #include "SSAO.h"
@@ -60,6 +57,9 @@
 #include "UniformBufferObjects.h"
 #include "Window.h"
 #include "helpers.h"
+#include <nucleus/timing/CpuTimer.h>
+#include <nucleus/timing/TimerManager.h>
+#include <nucleus/utils/bit_coding.h>
 #if (defined(__linux) && !defined(__ANDROID__)) || defined(_WIN32) || defined(_WIN64)
 #include "GpuAsyncQueryTimer.h"
 #endif
@@ -105,13 +105,12 @@ void Window::initialise_gpu()
     logger->disableMessages(QList<GLuint>({ 131185 }));
     logger->startLogging(QOpenGLDebugLogger::SynchronousLogging);
 
-
     auto* shader_manager = Context::instance().shader_manager();
 
     m_tile_manager->init();
     m_tile_manager->initilise_attribute_locations(shader_manager->tile_shader());
     m_avalanche_warning_layer->init();
-    m_avalanche_warning_layer->initilise_attribute_locations(m_shader_manager->eaws_shader());
+    m_avalanche_warning_layer->initilise_attribute_locations(shader_manager->eaws_shader());
     m_screen_quad_geometry = gl_engine::helpers::create_screen_quad_geometry();
     // NOTE to position buffer: The position can not be recalculated by depth alone. (given the numerical resolution of the depth buffer and
     // our massive view spektrum). ReverseZ would be an option but isnt possible on WebGL and OpenGL ES (since their depth buffer is aligned from -1...1)
@@ -285,12 +284,10 @@ void Window::paint(QOpenGLFramebufferObject* framebuffer)
     shader_manager->tile_shader()->release();
 
     // Draw Eaws Regions
-    m_shader_manager->eaws_shader()->bind();
-    m_avalanche_warning_layer->draw(m_shader_manager->tile_shader(), m_camera, culled_tile_set, true, m_camera.position());
-    m_shader_manager->eaws_shader()->release();
+    shader_manager->eaws_shader()->bind();
+    m_avalanche_warning_layer->draw(shader_manager->eaws_shader(), m_camera, culled_tile_set, true, m_camera.position());
+    shader_manager->eaws_shader()->release();
     m_gbuffer->unbind();
-
-    shader_manager->tile_shader()->release();
 
     if (m_shared_config_ubo->data.m_ssao_enabled) {
         m_timer->start_timer("ssao");

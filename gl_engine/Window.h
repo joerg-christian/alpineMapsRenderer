@@ -96,7 +96,6 @@ private:
     std::unique_ptr<TileManager> m_tile_manager; // needs opengl context
     std::unique_ptr<AvalancheWarningLayer> m_avalanche_warning_layer; // needs opengl context
 
-    std::unique_ptr<ShaderManager> m_shader_manager;
     std::shared_ptr<MapLabelManager> m_map_label_manager; // needs to be shared_ptr since we are using "connect"
 
     std::unique_ptr<Framebuffer> m_gbuffer;
