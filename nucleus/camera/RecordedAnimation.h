@@ -1,6 +1,5 @@
 /*****************************************************************************
  * AlpineMaps.org
- * Copyright (C) 2024 Lucas Dworschak
  * Copyright (C) 2024 Adam Celarek
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,31 +18,22 @@
 
 #pragma once
 
-#include <QHash>
+#include "AnimationStyle.h"
+#include "recording.h"
 #include <QObject>
-#include <QString>
-#include <QVariantHash>
-#include <cstdint>
-#include <glm/glm.hpp>
-#include <radix/tile.h>
+#include <chrono>
+#include <nucleus/utils/Stopwatch.h>
 
-namespace nucleus::vector_tile {
+namespace nucleus::camera {
 
-struct PointOfInterest {
-    Q_GADGET
+class RecordedAnimation : public AnimationStyle {
 public:
-    enum class Type { Unknown = 0, Peak, Settlement, AlpineHut, Webcam, NumberOfElements };
-    Q_ENUM(Type)
-    uint64_t id = -1;
-    Type type = Type::Unknown;
-    QString name;
-    glm::dvec3 lat_long_alt = glm::dvec3(0);
-    glm::dvec3 world_space_pos = glm::dvec3(0);
-    float importance = 0;
-    QVariantHash attributes;
-};
-using PointOfInterestCollection = std::vector<PointOfInterest>;
-using PointOfInterestCollectionPtr = std::shared_ptr<const PointOfInterestCollection>;
-using PointOfInterestTileCollection = std::unordered_map<tile::Id, PointOfInterestCollectionPtr, tile::Id::Hasher>;
+    RecordedAnimation(const recording::Animation& animation);
+    std::optional<Definition> update(Definition camera, AbstractDepthTester* depth_tester) override;
 
-} // namespace nucleus::vector_tile
+private:
+    utils::Stopwatch m_stopwatch = {};
+    recording::Animation m_animation;
+};
+
+} // namespace nucleus::camera

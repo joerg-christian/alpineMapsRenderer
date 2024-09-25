@@ -1,6 +1,7 @@
 ﻿/*****************************************************************************
- * Alpine Terrain Renderer
+ * AlpineMaps.org
  * Copyright (C) 2024 Lucas Dworschak
+ * Copyright (C) 2024 Adam Celarek
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *****************************************************************************/
+
 
 import QtQuick
 import QtQuick.Controls.Material
@@ -76,12 +78,10 @@ Rectangle {
             ModelBinding on checked { target: map; property: "label_filter.peaks_visible"; }
 
             Label {
-//                Layout.columnSpan: 2
                 text: "Elevation"
             }
 
             LabledRangeSlider {
-//                Layout.columnSpan: 2
                 id: filter_peaks_elevation_range;
                 from: 0; to: 4000; stepSize: 10;
                 labelWidth:100;
@@ -110,20 +110,6 @@ Rectangle {
             name: "Cities"
             checkBoxEnabled: true
             ModelBinding on checked { target: map; property: "label_filter.cities_visible"; }
-
-//            Label {
-//                Layout.columnSpan: 2
-//                text: "Population"
-//            }
-
-//            LabledRangeSlider {
-//                Layout.columnSpan: 2
-//                from: map.label_filter.city_population_range.x; to: map.label_filter.city_population_range.y; stepSize: 100;
-//                labelWidth:100;
-//                ModelBinding on first.value { target: map; property: "label_filter.city_population_range.x"; }
-//                ModelBinding on second.value { target: map; property: "label_filter.city_population_range.y"; }
-//            }
-
         }
 
         CheckGroup {
@@ -131,20 +117,6 @@ Rectangle {
             name: "Cottages"
             checkBoxEnabled: true
             ModelBinding on checked { target: map; property: "label_filter.cottages_visible"; }
-
-//            Label {
-//                Layout.columnSpan: 2
-//                text: "Elevation"
-//            }
-
-//            LabledRangeSlider {
-//                Layout.columnSpan: 2
-//                from: map.label_filter.cottage_ele_range.x; to: map.label_filter.cottage_ele_range.y; stepSize: 10;
-//                labelWidth:100;
-//                ModelBinding on first.value { target: map; property: "label_filter.cottage_ele_range.x"; }
-//                ModelBinding on second.value { target: map; property: "label_filter.cottage_ele_range.y"; }
-//            }
-
             CheckBox{
                 ModelBinding on checked { target: map; property: "label_filter.cottage_has_shower"; }
             }
@@ -158,7 +130,6 @@ Rectangle {
             Label {
                 text: "has contact"
             }
-
         }
 
         CheckGroup {
@@ -166,9 +137,10 @@ Rectangle {
             name: "Webcams"
             checkBoxEnabled: true
             ModelBinding on checked { target: map; property: "label_filter.webcams_visible"; }
+            Label {
+                text: " " // padding, without the tickbox doesn't work propertly
+            }
         }
-
-
     }
 }
 

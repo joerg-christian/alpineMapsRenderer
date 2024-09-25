@@ -1,6 +1,6 @@
 /*****************************************************************************
- * Alpine Terrain Renderer
- * Copyright (C) 2023 Gerald Kimmersdorfer
+ * AlpineMaps.org
+ * Copyright (C) 2024 Adam Celarek
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,31 +18,36 @@
 
 #pragma once
 
+#include "Definition.h"
 #include <QObject>
-#include <QMap>
-#include <QList>
-#include <QString>
+#include <chrono>
+#include <nucleus/utils/Stopwatch.h>
 
-#include "nucleus/timing/TimerManager.h"
-#include "TimerFrontendObject.h"
+namespace nucleus::camera::recording {
 
-class TimerFrontendManager : public QObject
-{
+struct Frame {
+    long msec = 0;
+    glm::dmat4 camera_to_world_matrix = {};
+};
+using Animation = std::vector<Frame>;
+
+class Device : public QObject {
     Q_OBJECT
 
 public:
-    TimerFrontendManager(QObject* parent = nullptr);
-    ~TimerFrontendManager() override;
+    Device();
+    std::vector<Frame> recording() const;
+    void reset();
 
 public slots:
-    void receive_measurements(QList<nucleus::timing::TimerReport> values);
-
-signals:
-    void updateTimingList(QList<TimerFrontendObject*> data);
+    void record(const Definition& def);
+    void start();
+    void stop();
 
 private:
-    QList<TimerFrontendObject*> m_timer;
-    QMap<QString, TimerFrontendObject*> m_timer_map;
-    static int current_frame;
-
+    bool m_enabled = false;
+    utils::Stopwatch m_stopwatch = {};
+    Animation m_frames;
 };
+
+} // namespace nucleus::camera::recording

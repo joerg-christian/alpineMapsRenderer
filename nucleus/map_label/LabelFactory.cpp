@@ -96,9 +96,9 @@ Raster<glm::u8vec4> LabelFactory::label_icons()
     return combined_icons;
 }
 
-std::vector<VertexData> LabelFactory::create_labels(const vector_tile::PointOfInterestCollection& pois)
+std::tuple<std::vector<VertexData>, glm::dvec3, AtlasData> LabelFactory::create_labels(const vector_tile::PointOfInterestCollection& pois)
 {
-    std::vector<VertexData> labelData;
+    std::vector<VertexData> label_data;
 
     for (const auto& f : pois) {
         for (const auto ch : f.name) {
@@ -108,15 +108,19 @@ std::vector<VertexData> LabelFactory::create_labels(const vector_tile::PointOfIn
         }
     }
 
+    AtlasData atlas_data = LabelFactory::renew_font_atlas();
+
+    glm::dvec3 reference_point = pois.empty() ? glm::dvec3 {} : pois.front().world_space_pos;
+
     for (const auto& p : pois) {
         QString display_name = p.name;
         float importance = p.importance;
         switch (p.type) {
         case LabelType::Peak: {
             auto ele = p.attributes.value("ele");
-            if (ele.size() == 0)
+            if (!ele.isValid())
                 ele = QString::number(p.lat_long_alt.z, 'f', 0);
-            display_name = QString("%1 (%2m)").arg(p.name, ele);
+            display_name = QString("%1 (%2m)").arg(p.name, ele.toString());
             break;
         }
         case LabelType::AlpineHut:
@@ -127,10 +131,10 @@ std::vector<VertexData> LabelFactory::create_labels(const vector_tile::PointOfIn
         default:
             break;
         }
-        create_label(display_name, p.world_space_pos, p.type, p.id, importance, labelData);
+        create_label(display_name, p.world_space_pos - reference_point, p.type, p.id, importance, label_data);
     }
 
-    return labelData;
+    return { std::move(label_data), reference_point, std::move(atlas_data) };
 }
 
 void LabelFactory::create_label(

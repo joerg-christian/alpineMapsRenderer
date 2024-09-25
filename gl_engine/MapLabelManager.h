@@ -45,6 +45,7 @@ struct GPUVectorTile {
     std::unique_ptr<QOpenGLBuffer> vertex_buffer;
     std::unique_ptr<QOpenGLVertexArrayObject> vao;
     size_t instance_count; // how many characters (+1 for icon)
+    glm::dvec3 reference_point = {};
 };
 
 class MapLabelManager : public QObject {
@@ -61,7 +62,6 @@ public:
     void update_labels(const PointOfInterestTileCollection& visible_features, const std::vector<tile::Id>& removed_tiles);
 
 private:
-    void renew_font_atlas();
     void upload_to_gpu(const tile::Id& id, const PointOfInterestCollection& features);
     void remove_tile(const tile::Id& tile_id);
 

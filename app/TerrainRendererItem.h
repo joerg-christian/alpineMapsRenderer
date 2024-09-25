@@ -36,7 +36,6 @@
 #include <nucleus/picker/types.h>
 
 #include "AppSettings.h"
-#include "timing/TimerFrontendManager.h"
 
 class QTimer;
 
@@ -54,7 +53,6 @@ class TerrainRendererItem : public QQuickFramebufferObject {
     Q_PROPERTY(float camera_operation_centre_distance READ camera_operation_centre_distance NOTIFY camera_operation_centre_distance_changed)
     Q_PROPERTY(gl_engine::uboSharedConfig shared_config READ shared_config WRITE set_shared_config NOTIFY shared_config_changed)
     Q_PROPERTY(nucleus::maplabel::FilterDefinitions label_filter READ label_filter WRITE set_label_filter NOTIFY label_filter_changed)
-    Q_PROPERTY(TimerFrontendManager* timer_manager MEMBER m_timer_manager CONSTANT)
     Q_PROPERTY(AppSettings* settings MEMBER m_settings CONSTANT)
     Q_PROPERTY(unsigned int in_flight_tiles READ in_flight_tiles NOTIFY in_flight_tiles_changed)
     Q_PROPERTY(unsigned int queued_tiles READ queued_tiles NOTIFY queued_tiles_changed)
@@ -63,8 +61,8 @@ class TerrainRendererItem : public QQuickFramebufferObject {
     Q_PROPERTY(unsigned int selected_camera_position_index MEMBER m_selected_camera_position_index WRITE set_selected_camera_position_index)
     Q_PROPERTY(QVector2D sun_angles READ sun_angles WRITE set_sun_angles NOTIFY sun_angles_changed)
     Q_PROPERTY(bool continuous_update READ continuous_update WRITE set_continuous_update NOTIFY continuous_update_changed)
-    Q_PROPERTY(nucleus::picker::Feature current_feature_data MEMBER m_current_feature_data NOTIFY feature_changed)
-    Q_PROPERTY(QList<QString> current_feature_data_list MEMBER m_current_feature_data_list NOTIFY feature_changed)
+    Q_PROPERTY(nucleus::picker::Feature picked_feature READ picked_feature NOTIFY picked_feature_changed FINAL)
+    Q_PROPERTY(QVector3D world_space_cursor_position READ world_space_cursor_position NOTIFY world_space_cursor_position_changed FINAL)
 
 public:
     explicit TerrainRendererItem(QQuickItem* parent = 0);
@@ -114,8 +112,6 @@ signals:
     void tile_cache_size_changed(unsigned new_cache_size);
     void eaws_tile_cache_size_changed(unsigned new_cache_size);
 
-    void gui_update_global_cursor_pos(double latitude, double longitude, double altitude);
-
     void sun_angles_changed(QVector2D newSunAngles);
 
     void reload_shader();
@@ -125,6 +121,10 @@ signals:
     void continuous_update_changed(bool continuous_update);
 
     void feature_changed();
+
+    void picked_feature_changed(const nucleus::picker::Feature& picked_feature);
+
+    void world_space_cursor_position_changed(const QVector3D& world_space_cursor_position);
 
 protected:
     void touchEvent(QTouchEvent*) override;
@@ -139,9 +139,7 @@ public slots:
     void set_position(double latitude, double longitude);
     void rotate_north();
     void set_gl_preset(const QString& preset_b64_string);
-    void read_global_position(glm::dvec3 latlonalt);
     void camera_definition_changed(const nucleus::camera::Definition& new_definition); // gets called whenever camera changes
-    void change_feature(const nucleus::picker::Feature feature);
 
 private slots:
     void schedule_update();
@@ -217,7 +215,13 @@ public:
     bool continuous_update() const;
     void set_continuous_update(bool new_continuous_update);
 
+    const nucleus::picker::Feature& picked_feature() const;
+
+    const QVector3D& world_space_cursor_position() const;
+
 private:
+    void set_world_space_cursor_position(const glm::dvec3& new_world_space_cursor_position);
+    void set_picked_feature(const nucleus::picker::Feature& new_picked_feature);
     void recalculate_sun_angles();
     void update_gl_sun_dir_from_sun_angles(gl_engine::uboSharedConfig& ubo);
 
@@ -239,8 +243,8 @@ private:
     unsigned int m_selected_camera_position_index = 0;
     QDateTime m_selected_datetime = QDateTime::currentDateTime();
 
-    nucleus::picker::Feature m_current_feature_data;
-    QList<QString> m_current_feature_data_list;
+    nucleus::picker::Feature m_picked_feature;
+    QVector3D m_world_space_cursor_position = {};
 
     gl_engine::uboSharedConfig m_shared_config;
     nucleus::maplabel::FilterDefinitions m_label_filter;
@@ -250,7 +254,6 @@ private:
     int m_camera_width = 0;
     int m_camera_height = 0;
 
-    TimerFrontendManager* m_timer_manager;
     AppSettings* m_settings;
     QVector2D m_sun_angles; // azimuth and zenith
     glm::dvec3 m_last_camera_latlonalt;
