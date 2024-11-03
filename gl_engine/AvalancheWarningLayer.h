@@ -73,6 +73,7 @@ private:
     static constexpr auto N_EDGE_VERTICES = 65;
     static constexpr auto ORTHO_RESOLUTION = 256;
     static constexpr auto HEIGHTMAP_RESOLUTION = 65;
+    static constexpr auto EAWS_RESOLUTION = 256;
 
     std::vector<tile::Id> m_loaded_tiles;
     std::unique_ptr<Texture> m_eaws_textures;

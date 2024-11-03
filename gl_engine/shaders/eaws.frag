@@ -69,10 +69,19 @@ void main() {
     while(texelFetch(tile_id_map_sampler, ivec2(int(hash & 255u), int(hash >> 8u)), 0).xy != packed_tile_id)
         hash++;
 
-    uint texture_layer_u = texelFetch(height_texture_layer_map_sampler, ivec2(int(hash & 255u), int(hash >> 8u)), 0).x;
-    highp vec3 fragColor = vec3(texture(eaws_region_sampler, vec3(uv, texture_layer_u)).rrr);
-    // highp vec3 fragColor = vec3(0.0, texture_layer_f, 0.0);
-    fragColor = mix(fragColor, conf.material_color.rgb, conf.material_color.a);
+    uint texture_layer_u = texelFetch(height_texture_layer_map_sampler, ivec2(int(hash & 255u), int(hash >> 8u)), 0).x; // should be between 0 and 2047
+
+    float value = texture(eaws_region_sampler, vec3(uv,texture_layer_u)).r;
+    highp vec3 fragColor = vec3(0.,0.,0.);                   // BLACK
+    if(value == 0.0f) fragColor = vec3(1,1,1);                  // white
+    if(value > 0.0f  && value <= 10.0f) fragColor = vec3(1,0,0); // red
+    if(value > 10.0f && value <= 30.0f) fragColor = vec3(0,1,0); // grenn
+    if(value > 30.0f && value <= 50.0f) fragColor = vec3(0,0,1); // blue
+    if(value > 50.0f && value <= 100.0f) fragColor = vec3(1,1,0); // yellow
+    if(value > 100.0f && value<= 200.0f) fragColor = vec3(0,1,1); // turquise
+    if(value > 200.0f && value<= 300.0f) fragColor = vec3(1,0,1); // purple
+
+    //fragColor = mix(fragColor, conf.material_color.rgb, conf.material_color.a);
     texout_albedo = fragColor;
 
     // Write Position (and distance) in gbuffer

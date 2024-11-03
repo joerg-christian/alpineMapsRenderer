@@ -80,7 +80,7 @@
 
      m_eaws_textures = std::make_unique<Texture>(Texture::Target::_2dArray, Texture::Format::R16UI);
      m_eaws_textures->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
-     m_eaws_textures->allocate_array(HEIGHTMAP_RESOLUTION, HEIGHTMAP_RESOLUTION, unsigned(m_loaded_tiles.size()));
+     m_eaws_textures->allocate_array(EAWS_RESOLUTION, EAWS_RESOLUTION, unsigned(m_loaded_tiles.size()));
 
      m_tile_id_map_texture = std::make_unique<Texture>(Texture::Target::_2d, Texture::Format::RG32UI);
      m_tile_id_map_texture->setParams(Texture::Filter::Nearest, Texture::Filter::Nearest);
@@ -155,7 +155,7 @@
      m_height_texture_layer_buffer->bind();
      m_height_texture_layer_buffer->write(
          0, height_texture_layer.data(), GLsizei(height_texture_layer.size() * sizeof(decltype(height_texture_layer)::value_type)));
-
+     m_index_buffer.first->bind();
      f->glDrawElementsInstanced(GL_TRIANGLE_STRIP, GLsizei(m_index_buffer.second), GL_UNSIGNED_SHORT, nullptr, GLsizei(tile_list.size()));
      f->glBindVertexArray(0);
  }

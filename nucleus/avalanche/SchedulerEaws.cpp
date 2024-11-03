@@ -255,11 +255,13 @@ void SchedulerEaws::update_gpu_quads()
                 avalanche::eaws::RegionTile region_tile = result.value();
                 raster = avalanche::eaws::rasterize_regions(region_tile, &m_eaws_uint_id_manager, m_tile_size, m_tile_size, cpu_quad.tiles[i].id);
             }
+            // JCR: THis is a hack until I figured out how to pass 1x1 textures to the shaders
+            if (raster.width() == 1)
+                raster = nucleus::Raster<uint16_t>(glm::uvec2(m_tile_size, m_tile_size), raster.pixel(glm::uvec2(0, 0)));
             gpu_quad.tiles[i].raster = std::make_shared<nucleus::Raster<uint16_t>>(std::move(raster));
         }
         return gpu_quad;
     });
-
     emit gpu_quads_updated(new_gpu_quads, { superfluous_ids.cbegin(), superfluous_ids.cend() });
     update_stats();
 }

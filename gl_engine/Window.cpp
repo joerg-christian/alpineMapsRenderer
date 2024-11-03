@@ -279,7 +279,7 @@ void Window::paint(QOpenGLFramebufferObject* framebuffer)
     shader_manager->tile_shader()->bind();
     m_timer->start_timer("tiles");
     auto culled_tile_set = m_tile_manager->cull(tile_set, m_camera.frustum());
-    m_tile_manager->draw(shader_manager->tile_shader(), m_camera, culled_tile_set, true, m_camera.position());
+    // m_tile_manager->draw(shader_manager->tile_shader(), m_camera, culled_tile_set, true, m_camera.position());
     m_timer->stop_timer("tiles");
     shader_manager->tile_shader()->release();
 

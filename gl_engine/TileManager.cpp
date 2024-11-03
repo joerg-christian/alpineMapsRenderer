@@ -159,7 +159,7 @@ void TileManager::draw(ShaderProgram* shader_program, const nucleus::camera::Def
     m_height_texture_layer_buffer->bind();
     m_height_texture_layer_buffer->write(
         0, height_texture_layer.data(), GLsizei(height_texture_layer.size() * sizeof(decltype(height_texture_layer)::value_type)));
-
+    m_index_buffer.first->bind();
     f->glDrawElementsInstanced(GL_TRIANGLE_STRIP, GLsizei(m_index_buffer.second), GL_UNSIGNED_SHORT, nullptr, GLsizei(tile_list.size()));
     f->glBindVertexArray(0);
 }
